@@ -759,7 +759,7 @@ svg.elev .xend { cursor: ew-resize; } svg.elev .xend circle { stroke-width: 1.4;
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sv-0b7285: #59d6ed; --sv-0e8fa8: #59d5ed; --sv-155e2c: #6cdb8f; --sv-163f86: #6592e2; --sv-1b2230: #b8c2d7; --sv-1d2a3f: #aebcd3; --sv-1d3f78: #6e96d8; --sv-1d5bb8: #6497e3; --sv-1d7f3c: #6cda8f; --sv-1f8a4c: #6cda9a; --sv-39414f: #a2acbc; --sv-3b5b8f: #8197bb; --sv-3d4656: #9ca7b9; --sv-4a5466: #909bae; --sv-4f5868: #919aab; --sv-5aa469: #85ad8d; --sv-5b6576: #8c96a6; --sv-5d6778: #8c96a6; --sv-5d7a2e: #adcb7c; --sv-6a3fb5: #9879cd; --sv-6b7584: #8e97a4; --sv-7a8494: #8e96a4; --sv-7fa3e0: #81a4de; --sv-8a2027: #da6d74; --sv-8a2f2f: #ce7878; --sv-9aa3b0: #9aa3b0; --sv-9aa3b2: #9aa3b2; --sv-9b1c22: #e0676c; --sv-a04848: #ad8585; --sv-a35d00: #fab04c; --sv-a6c76a: #afcb7c; --sv-aab2bf: #424a57; --sv-b4bac4: #434a56; --sv-b5651d: #e2a064; --sv-b597ee: #b699ec; --sv-c0262d: #de696e; --sv-c9ced6: #373d48; --sv-c9d4e6: #28354a; --sv-cfd3d9: #353b43; --sv-cfd4db: #333a44; --sv-e08a8a: #de8c8c; --sv-e6a35a: #e3a663; --sv-e6b3b3: #e5b4b4; --sv-eceef1: #21262d; --sv-eef0f3: #1f242b; --sv-f1f2f4: #1f2228; --sv-f3f4f6: #1d2027; --sv-ffffff: #151b24; } }
 :root[data-theme="dark"] { --sv-0b7285: #59d6ed; --sv-0e8fa8: #59d5ed; --sv-155e2c: #6cdb8f; --sv-163f86: #6592e2; --sv-1b2230: #b8c2d7; --sv-1d2a3f: #aebcd3; --sv-1d3f78: #6e96d8; --sv-1d5bb8: #6497e3; --sv-1d7f3c: #6cda8f; --sv-1f8a4c: #6cda9a; --sv-39414f: #a2acbc; --sv-3b5b8f: #8197bb; --sv-3d4656: #9ca7b9; --sv-4a5466: #909bae; --sv-4f5868: #919aab; --sv-5aa469: #85ad8d; --sv-5b6576: #8c96a6; --sv-5d6778: #8c96a6; --sv-5d7a2e: #adcb7c; --sv-6a3fb5: #9879cd; --sv-6b7584: #8e97a4; --sv-7a8494: #8e96a4; --sv-7fa3e0: #81a4de; --sv-8a2027: #da6d74; --sv-8a2f2f: #ce7878; --sv-9aa3b0: #9aa3b0; --sv-9aa3b2: #9aa3b2; --sv-9b1c22: #e0676c; --sv-a04848: #ad8585; --sv-a35d00: #fab04c; --sv-a6c76a: #afcb7c; --sv-aab2bf: #424a57; --sv-b4bac4: #434a56; --sv-b5651d: #e2a064; --sv-b597ee: #b699ec; --sv-c0262d: #de696e; --sv-c9ced6: #373d48; --sv-c9d4e6: #28354a; --sv-cfd3d9: #353b43; --sv-cfd4db: #333a44; --sv-e08a8a: #de8c8c; --sv-e6a35a: #e3a663; --sv-e6b3b3: #e5b4b4; --sv-eceef1: #21262d; --sv-eef0f3: #1f242b; --sv-f1f2f4: #1f2228; --sv-f3f4f6: #1d2027; --sv-ffffff: #151b24; }
 @media print { :root:not([data-print]) { --sv-0b7285: #0b7285; --sv-0e8fa8: #0e8fa8; --sv-155e2c: #155e2c; --sv-163f86: #163f86; --sv-1b2230: #1b2230; --sv-1d2a3f: #1d2a3f; --sv-1d3f78: #1d3f78; --sv-1d5bb8: #1d5bb8; --sv-1d7f3c: #1d7f3c; --sv-1f8a4c: #1f8a4c; --sv-39414f: #39414f; --sv-3b5b8f: #3b5b8f; --sv-3d4656: #3d4656; --sv-4a5466: #4a5466; --sv-4f5868: #4f5868; --sv-5aa469: #5aa469; --sv-5b6576: #5b6576; --sv-5d6778: #5d6778; --sv-5d7a2e: #5d7a2e; --sv-6a3fb5: #6a3fb5; --sv-6b7584: #6b7584; --sv-7a8494: #7a8494; --sv-7fa3e0: #7fa3e0; --sv-8a2027: #8a2027; --sv-8a2f2f: #8a2f2f; --sv-9aa3b0: #9aa3b0; --sv-9aa3b2: #9aa3b2; --sv-9b1c22: #9b1c22; --sv-a04848: #a04848; --sv-a35d00: #a35d00; --sv-a6c76a: #a6c76a; --sv-aab2bf: #aab2bf; --sv-b4bac4: #b4bac4; --sv-b5651d: #b5651d; --sv-b597ee: #b597ee; --sv-c0262d: #c0262d; --sv-c9ced6: #c9ced6; --sv-c9d4e6: #c9d4e6; --sv-cfd3d9: #cfd3d9; --sv-cfd4db: #cfd4db; --sv-e08a8a: #e08a8a; --sv-e6a35a: #e6a35a; --sv-e6b3b3: #e6b3b3; --sv-eceef1: #eceef1; --sv-eef0f3: #eef0f3; --sv-f1f2f4: #f1f2f4; --sv-f3f4f6: #f3f4f6; --sv-ffffff: #ffffff; } }
-#report { --sv-0b7285: #0b7285; --sv-0e8fa8: #0e8fa8; --sv-155e2c: #155e2c; --sv-163f86: #163f86; --sv-1b2230: #1b2230; --sv-1d2a3f: #1d2a3f; --sv-1d3f78: #1d3f78; --sv-1d5bb8: #1d5bb8; --sv-1d7f3c: #1d7f3c; --sv-1f8a4c: #1f8a4c; --sv-39414f: #39414f; --sv-3b5b8f: #3b5b8f; --sv-3d4656: #3d4656; --sv-4a5466: #4a5466; --sv-4f5868: #4f5868; --sv-5aa469: #5aa469; --sv-5b6576: #5b6576; --sv-5d6778: #5d6778; --sv-5d7a2e: #5d7a2e; --sv-6a3fb5: #6a3fb5; --sv-6b7584: #6b7584; --sv-7a8494: #7a8494; --sv-7fa3e0: #7fa3e0; --sv-8a2027: #8a2027; --sv-8a2f2f: #8a2f2f; --sv-9aa3b0: #9aa3b0; --sv-9aa3b2: #9aa3b2; --sv-9b1c22: #9b1c22; --sv-a04848: #a04848; --sv-a35d00: #a35d00; --sv-a6c76a: #a6c76a; --sv-aab2bf: #aab2bf; --sv-b4bac4: #b4bac4; --sv-b5651d: #b5651d; --sv-b597ee: #b597ee; --sv-c0262d: #c0262d; --sv-c9ced6: #c9ced6; --sv-c9d4e6: #c9d4e6; --sv-cfd3d9: #cfd3d9; --sv-cfd4db: #cfd4db; --sv-e08a8a: #e08a8a; --sv-e6a35a: #e6a35a; --sv-e6b3b3: #e6b3b3; --sv-eceef1: #eceef1; --sv-eef0f3: #eef0f3; --sv-f1f2f4: #f1f2f4; --sv-f3f4f6: #f3f4f6; --sv-ffffff: #ffffff; }
+:is(#report, #ownrep) { --sv-0b7285: #0b7285; --sv-0e8fa8: #0e8fa8; --sv-155e2c: #155e2c; --sv-163f86: #163f86; --sv-1b2230: #1b2230; --sv-1d2a3f: #1d2a3f; --sv-1d3f78: #1d3f78; --sv-1d5bb8: #1d5bb8; --sv-1d7f3c: #1d7f3c; --sv-1f8a4c: #1f8a4c; --sv-39414f: #39414f; --sv-3b5b8f: #3b5b8f; --sv-3d4656: #3d4656; --sv-4a5466: #4a5466; --sv-4f5868: #4f5868; --sv-5aa469: #5aa469; --sv-5b6576: #5b6576; --sv-5d6778: #5d6778; --sv-5d7a2e: #5d7a2e; --sv-6a3fb5: #6a3fb5; --sv-6b7584: #6b7584; --sv-7a8494: #7a8494; --sv-7fa3e0: #7fa3e0; --sv-8a2027: #8a2027; --sv-8a2f2f: #8a2f2f; --sv-9aa3b0: #9aa3b0; --sv-9aa3b2: #9aa3b2; --sv-9b1c22: #9b1c22; --sv-a04848: #a04848; --sv-a35d00: #a35d00; --sv-a6c76a: #a6c76a; --sv-aab2bf: #aab2bf; --sv-b4bac4: #b4bac4; --sv-b5651d: #b5651d; --sv-b597ee: #b597ee; --sv-c0262d: #c0262d; --sv-c9ced6: #c9ced6; --sv-c9d4e6: #c9d4e6; --sv-cfd3d9: #cfd3d9; --sv-cfd4db: #cfd4db; --sv-e08a8a: #e08a8a; --sv-e6a35a: #e6a35a; --sv-e6b3b3: #e6b3b3; --sv-eceef1: #eceef1; --sv-eef0f3: #eef0f3; --sv-f1f2f4: #f1f2f4; --sv-f3f4f6: #f3f4f6; --sv-ffffff: #ffffff; }
 /* ---------- okno projektowania połączeń ---------- */
 .dlg.jdes { max-width: none !important; width: min(1500px, 98vw); height: 95vh; max-height: 95vh; display: flex; flex-direction: column; padding: 10px 14px 12px; overflow: hidden; }
 .jdes .jhead { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-bottom: 6px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
@@ -798,3 +798,44 @@ svg.elev .xend { cursor: ew-resize; } svg.elev .xend circle { stroke-width: 1.4;
 table.ctab td.tk input[disabled] { opacity: 1; }
 table.ctab td.tk input[data-tick] { accent-color: var(--ok); cursor: default; }
 
+
+/* ---- panel schematu (jak SłupŻB): nagłówek, legenda, para schematów, wybór kombinacji ---- */
+.schhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; margin-bottom: 6px; }
+.schhead h4 { margin: 0; }
+.schpair { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; }
+.schpair .schemewrap svg { width: 100%; height: auto; display: block; }
+.schunder { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 2px; }
+.cmbsel { min-height: 28px; }
+.schunder .cmbsel { flex: 1; min-width: 200px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin: 4px 0 6px; font-size: 12px; }
+.legend .lgi { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.legend .lgi i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.legend .lgi.off { opacity: .55; }
+.legend .lgi.off .lnk { text-decoration: line-through; }
+.legend .lgi input { margin: 0; }
+.ldsum tr[data-openload], .ldsum tr[data-selc], .ldsum tr[data-selcid] { cursor: pointer; }
+.ldsum tr[data-openload]:hover td, .ldsum tr[data-selc]:hover td, .ldsum tr[data-selcid]:hover td { background: var(--acc2); }
+.ldsum tr.sel td { background: color-mix(in srgb, var(--acc) 12%, transparent); }
+.ldsum td.n { text-align: right; white-space: nowrap; }
+.ldsum td.hs { font-size: 11.5px; color: var(--ink2); }
+.ldsum input.ldon { vertical-align: -2px; margin: 0 4px 0 0; cursor: pointer; }
+.schemesvg .mhit:hover { fill: color-mix(in srgb, var(--acc) 5%, transparent); }
+.schemesvg .ld:hover, .schemesvg .brace:hover, .schemesvg .supp:hover { filter: drop-shadow(0 0 2px var(--acc)); }
+.schgal { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.schgal .card { text-align: left; display: flex; gap: 10px; align-items: center; padding: 8px; cursor: pointer; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; }
+.schgal .card:hover { border-color: var(--acc); }
+.schgal .card.ok { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc) inset; }
+.xbox { border: 1px solid var(--line); border-radius: 6px; background: var(--panel2); padding: 6px 10px; margin: 6px 0 10px; }
+.xbox table.kv td:first-child { color: var(--ink3); width: 110px; }
+.ctab td.go { white-space: nowrap; }
+.ctab button.gobtn { font-size: 11.5px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--acc); cursor: pointer; }
+.ctab button.gobtn:hover { border-color: var(--acc); }
+.secx { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; font-size: 12.5px; }
+.secx input { width: 70px; }
+.ldlist { margin: 2px 0 6px; }
+.ldlist .lrow { flex-wrap: nowrap; padding: 2px 0 2px 6px; }
+.ldlist .lrow b { flex: none; }
+:is(#report, #ownrep) table.rtab { border-collapse: collapse; margin: 6px 0 10px; font-size: 11.5px; color: #000; }
+:is(#report, #ownrep) table.rtab th, :is(#report, #ownrep) table.rtab td { border: 1px solid #c8cdd5; padding: 2px 7px; text-align: left; vertical-align: top; }
+:is(#report, #ownrep) table.rtab th { background: #f1f3f6; font-weight: 600; }
+:is(#report, #ownrep) table.rtab tr { page-break-inside: avoid; }

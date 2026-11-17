@@ -26,6 +26,28 @@ każdego parametru.
 Ręczne nadpisania: L<sub>cr,y</sub>, L<sub>cr,z</sub>, μ, L<sub>cr,T</sub>, krzywe wyboczenia i zwichrzenia, M<sub>cr</sub>,
 k<sub>c</sub>, C<sub>my</sub>, C<sub>mz</sub>, C<sub>mLT</sub>, φ, e₀, f<sub>y</sub>, k<sub>j</sub>, wszystkie NDP (γ<sub>M</sub>, γ<sub>G</sub>, ψ, λ̄<sub>LT,0</sub>, β, …).
 
+## Obsługa (jak w BelkaStal / SłupŻB)
+
+* **Schemat statyczny (zakładka Dane)** – dwie płaszczyzny (x–z: M<sub>y</sub>, x–y: M<sub>z</sub>); klik na obciążeniu –
+  edycja, na podporze – warunki podparcia, na stężeniu – edycja, na słupie – przekrój, dwuklik – nowe
+  obciążenie na tej wysokości, klik na wykresie – siły i sprawdzenia na wysokości x, prawy przycisk – menu
+  (zmień, duplikuj, wyłącz/włącz, usuń, dodaj stężenie…). Pod schematem: wykres M / V / N / przemieszczenia /
+  postać wyboczenia oraz wybór kombinacji (obwiednia SGN lub dowolna kombinacja), legenda obciążeń,
+  „Zestawienie obciążeń” z wyłączaniem, „Kombinacje decydujące”, siły na fundament, „Schematy typowe…”.
+* **Słup i podstawa** – widok 2D (rzut z podstawą, fundamentem, stężeniami) przełączany na **widok 3D**
+  (obrót, przesuw, powiększenie, widoki standardowe; obciążenia, fundament, postacie wyboczenia: giętne y/z,
+  skrętne/giętno-skrętne, zwichrzenie, ugięcia SGU); przekrój pod kursorem, zestawienie materiałów, DXF.
+* **Przekrój i nośność** – klik na pasie / środniku otwiera okno przekroju z podświetlonymi wymiarami tej
+  części; przekrój z naprężeniami na dowolnej wysokości x (pole lub klik na wykresie η(x)).
+* **Wykresy** – kursor pokazuje wartości na wszystkich wykresach; klik – znacznik (ponownie – usuń, prawy
+  przycisk – usuń wszystkie), klik etykiety znacznika – siły i sprawdzenia w tym miejscu.
+* **Podsumowanie** – „pokaż →” przy każdym warunku przenosi do miejsca (pola danych, zakładki, wiersza),
+  od którego warunek zależy; okno „Jak obliczono” – warunek, wytężenie, wzory i podstawienia, punkt normy.
+* **Raport** – pełny, statyka lub **raport własny** (edytor: pisanie, usuwanie fragmentów, nagłówki,
+  listy, wstawianie raportu / statyki / zestawienia wyników; zapisywany w pliku projektu); druk i PDF
+  bezpośrednio z okna programu, zapis HTML (z danymi do ponownego otwarcia) i .odt.
+* **Nowy projekt** – przykład słupa hali, przykład słupa przegubowego lub projekt pusty.
+
 ## Uruchomienie
 
 * **Windows**: `SlupStal.exe` (w katalogu głównym repozytorium). Wymaga Microsoft Edge
@@ -48,7 +70,7 @@ Ikona: `node host/make-icon.js` i `rsrc -ico host/slupstal.ico -arch amd64 -o ho
 ```bash
 node test/fe.test.js         # MES wobec rozwiązań zamkniętych (N_cr, II rząd, imperfekcje, N_cr,T, M_cr, N_cr,TF)
 node test/engine.test.js     # przykłady liczone ręcznie + przegląd 28 konfiguracji + dobór
-node test/ui.test.js         # test funkcjonalny interfejsu (Playwright/Chromium)
+node test/ui.test.js         # test funkcjonalny interfejsu (Playwright/Chromium): 39 scenariuszy
 ```
 
 ## Struktura

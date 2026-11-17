@@ -15,7 +15,7 @@ let S = J.defaultState(), R = null, filePath = '', dirty = false;
 let COLS = null, curC = 0;
 let diagMode = (() => { try { return localStorage.getItem('ss.diag') || 'M'; } catch (e) { return 'M'; } })();
 let rendered = {};
-const hiddenLoads = new Set();
+let schCombo = null; // kombinacja na schemacie (indeks R.res) lub null – obwiednia
 A.S = () => S; A.R = () => R;
 
 /* ================================================================ DEFINICJE PÓL */
@@ -160,7 +160,7 @@ function stabHint() {
 }
 function loadListHTML() {
   const L = S.obciazenia || [];
-  let h = '<div class="ldl">';
+  let h = '<div class="ldlist">';
   L.forEach((o, i) => {
     const col = D.loadColor(o);
     const sk = (o.sklad || []).map(p => p.typ === 'N' ? `N ${fmt(U.num(p.F), 1)} kN${U.num(p.ez) || U.num(p.ey) ? ` (e ${fmt(U.num(p.ez), 0)}/${fmt(U.num(p.ey), 0)})` : ''}` : p.typ === 'H' ? `H<sub>${p.kier}</sub> ${fmt(U.num(p.F), 1)} kN` : p.typ === 'q' ? `q<sub>${p.kier}</sub> ${fmt(U.num(p.q0), 2)} kN/m` : `M<sub>${p.os}</sub> ${fmt(U.num(p.M), 1)} kNm`).join(', ');
@@ -261,7 +261,7 @@ function bindFields(host, after) {
   $$('.combo button', host).forEach(b => b.addEventListener('click', () => Q.openList(b, inp => { numInput(inp, true); done(!!inp.dataset.re); })));
   $$('input[type=checkbox][data-k]', host).forEach(el => el.addEventListener('change', () => { setP(S, el.dataset.k, el.checked); onSet(el.dataset.k, el.checked); changed(!!el.dataset.re); done(!!el.dataset.re); }));
   $$('input[data-kt], textarea[data-kt]', host).forEach(el => el.addEventListener('input', () => { setP(S, el.dataset.kt, el.value); changed(false); done(false); }));
-  $$('[data-lon]', host).forEach(cb => cb.addEventListener('change', () => { S.obciazenia[+cb.dataset.lon].aktywne = cb.checked; changed(false); }));
+  $$('[data-lon]', host).forEach(cb => cb.addEventListener('change', () => { S.obciazenia[+cb.dataset.lon].aktywne = cb.checked; changed(true); }));
   $$('[data-ledit]', host).forEach(b => b.addEventListener('click', () => A.loadPopup(+b.dataset.ledit)));
 }
 A.bindFields = bindFields;
@@ -394,39 +394,114 @@ function colTabsHTML() {
 }
 function renderDataSide() {
   const el = $('#dataside'); if (!el) return;
-  const W = Math.max(260, Math.min(360, (el.clientWidth || 640) / 2 - 18));
-  const gv = R && R.res && !R.errors.length ? BS.Raport.govMember(R) : null;
+  const W = Math.max(250, Math.min(360, (el.clientWidth || 640) / 2 - 22));
+  const ok = R && R.res && !R.errors.length;
+  const gv = ok ? BS.Raport.govMember(R) : null;
   const secName = R && R.sec ? `${R.sec.nazwa} · ${S.material.gatunek}${S.material.podgatunek}` : '';
-  const DG = [['M', 'M'], ['V', 'V'], ['N', 'N'], ['w', 'przemieszczenie'], ['buck', 'postać wyboczenia'], ['none', 'bez wykresu']];
+  if (!ok || (schCombo !== null && !R.res[schCombo])) schCombo = null;
+  const sf = schF();
+  const DG = [['M', 'M', 'Momenty zginające M_Ed'], ['V', 'V', 'Siły poprzeczne V_Ed'], ['N', 'N', 'Siła podłużna N_Ed'], ['w', 'przemieszczenie', 'Przemieszczenia poziome (SGU)'], ['buck', 'wyboczenie', 'Postać wyboczenia i L_cr'], ['none', 'bez wykresu', 'Tylko schemat i obciążenia']];
   let h = colTabsHTML();
-  h += `<div class="box"><div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between"><h4 style="margin:0">Schemat statyczny i obciążenia</h4><span><button class="btn sm" data-act="addload" type="button">+ Obciążenie</button> <button class="btn sm" data-act="braces" type="button">Stężenia</button> <button class="btn sm" data-act="secwin" type="button">Przekrój</button> <button class="btn sm" data-act="basewin" type="button">Podstawa</button></span></div>`;
-  h += `<div class="hint">Kliknij obciążenie – zmiana; podporę – warunki podparcia; stężenie – edycja; dwuklik na słupie – nowe obciążenie na tej wysokości. Wartości obciążeń – charakterystyczne.</div>`;
-  h += `<div class="schemewrap" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${D.scheme(S, R, 'y', { W, H: 470, diag: diagMode, gov: gv, secName, loadsOn: null })}${D.scheme(S, R, 'z', { W, H: 470, diag: diagMode, gov: gv, secName, loadsOn: null })}</div>`;
-  h += `<div class="segsw sm" style="margin-top:6px">${DG.map(([k, l]) => `<button class="${diagMode === k ? 'on' : ''}" data-diag="${k}" type="button">${l}</button>`).join('')}</div>`;
+  h += `<div class="box"><div class="schhead"><h4>Schemat statyczny i obciążenia</h4><div class="schtools"><button class="btn sm" data-act="addload" type="button" title="Nowe obciążenie (wiele składników: N, H, q, M)">+ Obciążenie</button><button class="btn sm" data-stool="sup" type="button" title="Warunki podparcia w obu płaszczyznach">Podparcie</button><button class="btn sm" data-act="braces" type="button" title="Stężenia boczne i skrętne na wysokości słupa">Stężenia</button><button class="btn sm" data-act="secwin" type="button" title="Przekrój: rodzaj, kształtownik, wymiary, dobór">Przekrój</button><button class="btn sm" data-act="basewin" type="button" title="Projektant podstawy słupa">Podstawa</button><button class="btn sm" data-stool="schemes" type="button" title="Typowe schematy podparcia słupa">Schematy typowe…</button><button class="btn sm" data-stool="v3d" type="button" title="Widok przestrzenny słupa z podstawą, obciążeniami i postaciami wyboczenia (zakładka „Słup i podstawa”)">Widok 3D</button></div></div>`;
+  h += `<div class="schsel"><span class="mut">Kliknij obciążenie – zmiana; podporę – warunki podparcia; stężenie – edycja; słup – przekrój; dwuklik na słupie – obciążenie na tej wysokości; wykres – siły i sprawdzenia na tej wysokości; prawy przycisk – menu.</span></div>`;
+  h += legendHTML();
+  h += `<div class="schpair" id="schPair">${['y', 'z'].map(pl => `<div class="schemewrap">${D.scheme(S, R, pl, { W, H: 470, diag: diagMode, gov: gv, secName, loadsOn: null, F: sf ? sf.F : null, Flab: sf ? sf.lab : '' })}</div>`).join('')}</div>`;
+  const comboSel = ok ? `<select id="schCombo" class="cmbsel" title="Kombinacja pokazana na wykresach schematu"><option value="">obwiednia SGN (wszystkie kombinacje)</option>${R.res.map((cr, i) => `<option value="${i}" ${schCombo === i ? 'selected' : ''}>${esc(cr.combo.id)} – ${esc((cr.combo.opis || '').slice(0, 70))}</option>`).join('')}</select>` : '';
+  h += `<div class="schunder"><div class="segsw sm">${DG.map(([k, l, t]) => `<button class="${diagMode === k ? 'on' : ''}" data-diag="${k}" type="button" title="${esc(t)}">${l}</button>`).join('')}</div>${comboSel}</div>`;
+  if (sf) h += `<div class="combsum"><b>${esc(sf.cr.combo.id)}</b>: ${esc(sf.cr.combo.opis || '')}${sf.cr.variants.length > 1 ? ` <small>· wariant ${esc(sf.v.lab)}</small>` : ''} · N<sub>Ed,max</sub> = ${fmt(maxA(sf.F.N) / 1e3, 1)} kN, |M<sub>y,Ed</sub>|<sub>max</sub> = ${fmt(maxA(sf.F.y.M) / 1e6, 1)} kNm, |M<sub>z,Ed</sub>|<sub>max</sub> = ${fmt(maxA(sf.F.z.M) / 1e6, 1)} kNm, η = <b>${fmt(uOf(sf.v) * 100, 0)}%</b> <button class="lnk" id="schEnv" type="button">obwiednia</button></div>`;
   if (R && R.errors && R.errors.length) h += R.errors.map(e => `<div class="msg err" style="margin-top:6px">${esc(e)}</div>`).join('');
   h += '</div>';
+  h += loadTableHTML();
+  if (ok) h += combosBoxHTML();
   // podsumowanie sił na fundament
   if (R && R.baseForces && R.baseForces.length) {
     const bf = R.baseForces, mx = (fn) => bf.reduce((a, q) => (Math.abs(fn(q)) > Math.abs(fn(a)) ? q : a));
     const qN = bf.reduce((a, q) => (q.N > a.N ? q : a)), qM = mx(q => q.My), qMz = mx(q => q.Mz), qV = bf.reduce((a, q) => (Math.hypot(q.Vy, q.Vz) > Math.hypot(a.Vy, a.Vz) ? q : a));
-    const row = (l, q) => `<tr><td>${l}</td><td>${fmt(q.N / 1e3, 1)}</td><td>${fmt(q.My / 1e6, 1)}</td><td>${fmt(q.Mz / 1e6, 1)}</td><td>${fmt(Math.hypot(q.Vy, q.Vz) / 1e3, 1)}</td><td><small>${esc(q.combo.id)}</small></td></tr>`;
-    h += `<div class="box"><h4>Siły na fundament (obliczeniowe)</h4><div class="tscroll"><table class="ctab"><thead><tr><th></th><th>N [kN]</th><th>M<sub>y</sub> [kNm]</th><th>M<sub>z</sub> [kNm]</th><th>V [kN]</th><th>komb.</th></tr></thead><tbody>${row('max N', qN)}${row('max |M<sub>y</sub>|', qM)}${row('max |M<sub>z</sub>|', qMz)}${row('max V', qV)}</tbody></table></div></div>`;
+    const row = (l, q) => `<tr data-selcid="${esc(q.combo.id)}" title="Pokaż tę kombinację na schemacie"><td>${l}</td><td class="n">${fmt(q.N / 1e3, 1)}</td><td class="n">${fmt(q.My / 1e6, 1)}</td><td class="n">${fmt(q.Mz / 1e6, 1)}</td><td class="n">${fmt(Math.hypot(q.Vy, q.Vz) / 1e3, 1)}</td><td><small>${esc(q.combo.id)}</small></td></tr>`;
+    h += `<div class="box"><div class="schhead"><h4>Siły na fundament (obliczeniowe)</h4><button class="btn sm" data-act="basewin" type="button">Podstawa…</button></div><div class="tscroll"><table class="ldsum"><thead><tr><th></th><th>N [kN]</th><th>M<sub>y</sub> [kNm]</th><th>M<sub>z</sub> [kNm]</th><th>V [kN]</th><th>komb.</th></tr></thead><tbody>${row('max N', qN)}${row('max |M<sub>y</sub>|', qM)}${row('max |M<sub>z</sub>|', qMz)}${row('max V', qV)}</tbody></table></div></div>`;
   }
   el.innerHTML = h;
   bindSide(el);
+  Q.zoomApply(el);
 }
 A.renderDataSide = renderDataSide;
+const uOf = v => (v && v.mem ? Math.max(0, ...v.mem.segs.map(s => s.u)) : 0);
+const maxA = a => (a ? Array.from(a).reduce((m, v) => Math.max(m, Math.abs(v)), 0) : 0);
+// siły wybranej kombinacji (wariant decydujący) – do wykresów schematu
+function schF() {
+  if (schCombo === null || !R || !R.res || !R.res[schCombo]) return null;
+  const cr = R.res[schCombo], v = cr.variants.reduce((a, q) => (uOf(q) > uOf(a) ? q : a), cr.variants[0]);
+  if (!v || !v.F || !v.F.y) return null;
+  return { cr, v, F: v.F, lab: cr.combo.id };
+}
+A.schF = schF;
+A.setSchCombo = (i) => { schCombo = i; renderDataSide(); };
+const skladTxt = (o) => (o.sklad || []).map(p => p.typ === 'N' ? `N ${fmt(U.num(p.F), 1)} kN${p.x !== '' && p.x !== undefined ? ` @ ${fmt(U.num(p.x), 2)} m` : ''}${U.num(p.ez) || U.num(p.ey) ? ` (e<sub>z</sub> ${fmt(U.num(p.ez), 0)}, e<sub>y</sub> ${fmt(U.num(p.ey), 0)} mm)` : ''}` : p.typ === 'H' ? `H<sub>${p.kier}</sub> ${fmt(U.num(p.F), 1)} kN${p.x !== '' && p.x !== undefined ? ` @ ${fmt(U.num(p.x), 2)} m` : ''}` : p.typ === 'q' ? `q<sub>${p.kier}</sub> ${fmt(U.num(p.q0), 2)}${p.q1 !== '' && p.q1 !== undefined ? '…' + fmt(U.num(p.q1), 2) : ''} kN/m` : `M<sub>${p.os}</sub> ${fmt(U.num(p.M), 1)} kNm${p.x !== '' && p.x !== undefined ? ` @ ${fmt(U.num(p.x), 2)} m` : ''}`).join('; ');
+function legendHTML() {
+  const L = S.obciazenia || [];
+  if (!L.length) return '';
+  return `<div class="legend">${L.map((o, i) => `<span class="lgi ${o.aktywne === false ? 'off' : ''}" title="${esc(o.nazwa || '')}"><input type="checkbox" data-lgon="${i}" ${o.aktywne !== false ? 'checked' : ''} title="uwzględnij w obliczeniach"><i style="background:${D.loadColor(o)}"></i><button class="lnk" data-lgopen="${i}" type="button">${esc(o.id)}</button></span>`).join('')}<span class="hint" style="margin:0">wartości charakterystyczne</span></div>`;
+}
+function loadTableHTML() {
+  const L = S.obciazenia || [];
+  const rows = L.map((o, i) => {
+    const R0 = S0.RODZAJE[o.rodzaj] || { n: o.rodzaj }, psi = BS.K && BS.K.psi ? BS.K.psi(o) : null;
+    return `<tr data-openload="${i}" class="${o.aktywne === false ? 'ldoff' : ''}"><td><input type="checkbox" class="ldon" data-loff="${i}" ${o.aktywne !== false ? 'checked' : ''} title="uwzględnij w obliczeniach"></td><td><b style="color:${D.loadColor(o)}">${esc(o.id)}</b></td><td>${esc(o.nazwa || '(bez nazwy)')}<small> · ${esc(R0.n)}${o.rodzaj === 'Q' && N.PSI[o.kat] ? ' ' + esc(o.kat) : ''}${o.wyklucz ? ` · grupa ${esc(o.wyklucz)}` : ''}</small></td><td class="hs">${skladTxt(o)}</td><td class="n">${psi && !R0.stale && o.rodzaj !== 'A' ? psi.map(v => fmt(v, 1)).join(' / ') : '—'}</td></tr>`;
+  }).join('');
+  return `<div class="box"><div class="schhead"><h4>Zestawienie obciążeń (wartości charakterystyczne)</h4><span class="hint" style="margin:0">${L.filter(o => o.aktywne !== false).length} z ${L.length} uwzględnionych</span></div>
+    <div class="tscroll"><table class="ldsum"><thead><tr><th></th><th></th><th>Nazwa · rodzaj</th><th>Składniki</th><th>ψ₀ / ψ₁ / ψ₂</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="lnone">Brak obciążeń – dodaj je przyciskami poniżej.</td></tr>'}</tbody></table></div>
+    <div class="addbar">${[['G', '+ stałe'], ['Q', '+ użytkowe'], ['S', '+ śnieg'], ['W', '+ wiatr'], ['T', '+ inne zmienne']].map(([k, l]) => `<button class="btn sm" data-addl="${k}" type="button">${l}</button>`).join('')}</div>
+    <p class="hint">Kliknij wiersz – edycja składników; prawy przycisk – menu (duplikuj, wyłącz, usuń). Ciężar własny słupa dodawany automatycznie jako obciążenie stałe. Kombinacje tworzone automatycznie wg PN-EN 1990 (grupy wykluczające się – np. kierunki wiatru).</p></div>`;
+}
+function combosBoxHTML() {
+  const res = R.res || []; if (!res.length) return '';
+  const rk = res.map((cr, i) => { const v = cr.variants.reduce((a, q) => (uOf(q) > uOf(a) ? q : a), cr.variants[0]); return { i, cr, v, u: uOf(v) }; }).sort((a, b) => b.u - a.u).slice(0, 6);
+  return `<div class="box"><div class="schhead"><h4>Kombinacje decydujące</h4><span class="hint" style="margin:0">${res.length} kombinacji SGN · ${esc(R.method === 'I' ? 'analiza I rzędu' : 'analiza II rzędu')}</span></div><div class="tscroll"><table class="ldsum"><thead><tr><th>Kombinacja</th><th>N<sub>Ed,max</sub> [kN]</th><th>|M<sub>y</sub>|<sub>max</sub> [kNm]</th><th>|M<sub>z</sub>|<sub>max</sub> [kNm]</th><th>η<sub>elem.</sub></th></tr></thead><tbody>${rk.map(q => `<tr data-selc="${q.i}" class="${schCombo === q.i ? 'sel' : ''}" style="cursor:pointer" title="Pokaż na schemacie"><td><b>${esc(q.cr.combo.id)}</b> <small>${esc((q.cr.combo.opis || '').slice(0, 60))}</small></td><td class="n">${q.v.F && q.v.F.N ? fmt(maxA(q.v.F.N) / 1e3, 1) : '—'}</td><td class="n">${q.v.F && q.v.F.y ? fmt(maxA(q.v.F.y.M) / 1e6, 1) : '—'}</td><td class="n">${q.v.F && q.v.F.z ? fmt(maxA(q.v.F.z.M) / 1e6, 1) : '—'}</td><td class="n"><b style="color:var(--${q.u > 1 ? 'fail' : 'ok'})">${fmt(q.u * 100, 0)}%</b></td></tr>`).join('')}</tbody></table></div><p class="hint">Kliknij wiersz – wykresy schematu dla tej kombinacji (wariant imperfekcji decydujący).</p></div>`;
+}
+function loadMenu(i, x, y) {
+  const L = S.obciazenia[i]; if (!L) return;
+  Q.ctxMenu(x, y, [['edit', `Zmień ${esc(L.id)}…`], ['dup', 'Duplikuj'], ['onoff', L.aktywne === false ? 'Włącz (uwzględnij w obliczeniach)' : 'Wyłącz (pomiń w obliczeniach)'], ['-'], ['del', 'Usuń…']], async a => {
+    if (a === 'edit') A.loadPopup(i);
+    else if (a === 'dup') { const c = U.clone(L), used = new Set(S.obciazenia.map(o => o.id)); const r = (L.id.match(/^[A-Za-z]+/) || ['Q'])[0]; let k = 1; while (used.has(r + k)) k++; c.id = r + k; c.nazwa = (L.nazwa || '') + ' (kopia)'; S.obciazenia.splice(i + 1, 0, c); changed(true); }
+    else if (a === 'onoff') { L.aktywne = L.aktywne === false; changed(true); }
+    else if (a === 'del') { if (await Q.ask(`Usunąć obciążenie ${esc(L.id)}?`, 'Usuń', true)) { S.obciazenia.splice(i, 1); changed(true); } }
+  });
+}
+function addLoadOf(k) {
+  const used = new Set(S.obciazenia.map(o => o.id)); const r = k === 'T' ? 'T' : k; let i = 1; while (used.has(r + i)) i++;
+  const nm = { G: 'Obciążenie stałe', Q: 'Obciążenie użytkowe', S: 'Śnieg', W: 'Wiatr', T: 'Temperatura / inne' }[k];
+  const L = { id: r + i, nazwa: nm, rodzaj: k, kat: 'Q-B', wyklucz: k === 'W' ? 'W' : '', aktywne: true, sklad: [k === 'W' ? { typ: 'q', kier: 'z', q0: 2, q1: '', x0: '', x1: '', wys: 'srodek' } : { typ: 'N', x: '', F: k === 'G' ? 100 : 50, ey: 0, ez: 0 }] };
+  S.obciazenia.push(L); changed(true); A.loadPopup(S.obciazenia.length - 1);
+}
+// wysokość x [mm] w miejscu kliknięcia na schemacie
+const xOfEv = (svg, ev) => { const r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal, py = vb.y + (ev.clientY - r.top) * vb.height / r.height; const mt = +svg.dataset.mt, hh = +svg.dataset.hh, Hmm = +svg.dataset.h; return Math.max(0, Math.min(Hmm, (1 - (py - mt) / hh) * Hmm)); };
 function bindSide(el) {
   $$('[data-diag]', el).forEach(b => b.addEventListener('click', () => { diagMode = b.dataset.diag; try { localStorage.setItem('ss.diag', diagMode); } catch (e) { /* */ } renderDataSide(); }));
   $$('[data-act]', el).forEach(b => b.addEventListener('click', () => doAct(b.dataset.act)));
-  $$('.ld', el).forEach(g => g.addEventListener('click', ev => { ev.stopPropagation(); A.loadPopup(+g.dataset.li); }));
-  $$('.supp', el).forEach(g => g.addEventListener('click', ev => { ev.stopPropagation(); A.supportPopup(g.dataset.sup); }));
-  $$('.brace', el).forEach(g => g.addEventListener('click', ev => { ev.stopPropagation(); A.bracesPopup(+g.dataset.brace); }));
+  $$('[data-stool]', el).forEach(b => b.addEventListener('click', () => { const k = b.dataset.stool; if (k === 'sup') A.supportPopup('y'); else if (k === 'schemes') A.schemesPopup(); else if (k === 'v3d') BS.W3.open(true); }));
+  const cs = $('#schCombo', el); if (cs) cs.addEventListener('change', () => A.setSchCombo(cs.value === '' ? null : +cs.value));
+  const se = $('#schEnv', el); if (se) se.onclick = () => A.setSchCombo(null);
+  $$('[data-selc]', el).forEach(tr => tr.addEventListener('click', () => A.setSchCombo(schCombo === +tr.dataset.selc ? null : +tr.dataset.selc)));
+  $$('[data-selcid]', el).forEach(tr => tr.addEventListener('click', () => { const i = R.res.findIndex(cr => cr.combo.id === tr.dataset.selcid); if (i >= 0) A.setSchCombo(i); }));
+  // obciążenia: klik – zmiana, prawy – menu
+  $$('.ld', el).forEach(g => { g.addEventListener('click', ev => { ev.stopPropagation(); A.loadPopup(+g.dataset.li); }); g.addEventListener('contextmenu', ev => { ev.preventDefault(); ev.stopPropagation(); loadMenu(+g.dataset.li, ev.clientX, ev.clientY); }); });
+  $$('.supp', el).forEach(g => { g.addEventListener('click', ev => { ev.stopPropagation(); A.supportPopup(g.dataset.sup); }); g.addEventListener('contextmenu', ev => { ev.preventDefault(); ev.stopPropagation(); const pl = g.dataset.sup; Q.ctxMenu(ev.clientX, ev.clientY, [['sup', `Warunki podparcia (${pl === 'y' ? 'x–z' : 'x–y'})…`], ['schemes', 'Schematy typowe…'], ['base', 'Podstawa słupa…']], a => { if (a === 'sup') A.supportPopup(pl); else if (a === 'schemes') A.schemesPopup(); else A.basePopup(); }); }); });
+  $$('.brace', el).forEach(g => { g.addEventListener('click', ev => { ev.stopPropagation(); A.bracesPopup(+g.dataset.brace); }); g.addEventListener('contextmenu', ev => { ev.preventDefault(); ev.stopPropagation(); const i = +g.dataset.brace; Q.ctxMenu(ev.clientX, ev.clientY, [['edit', `Zmień stężenie S${i + 1}…`], ['del', 'Usuń stężenie']], a => { if (a === 'edit') A.bracesPopup(i); else { S.stezenia.splice(i, 1); changed(true); } }); }); });
   $$('.schcol', el).forEach(g => {
-    g.addEventListener('click', () => A.secPopup());
-    g.addEventListener('dblclick', ev => { const svg = g.closest('svg'), r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal, py = (ev.clientY - r.top) * vb.height / r.height; const mt = +svg.dataset.mt, hh = +svg.dataset.hh, Hmm = +svg.dataset.h; const x = Math.max(0, Math.min(Hmm, (1 - (py - mt) / hh) * Hmm)); A.loadPopup(null, { x: Math.round(x / 50) * 0.05, pl: svg.dataset.pl }); });
+    g.addEventListener('click', ev => { if (ev.detail > 1) return; A.secPopup(); });
+    g.addEventListener('dblclick', ev => { const svg = g.closest('svg'); A.loadPopup(null, { x: Math.round(xOfEv(svg, ev) / 50) * 0.05, pl: svg.dataset.pl }); });
   });
-  $$('svg.schemesvg', el).forEach(svg => svg.addEventListener('contextmenu', ev => { ev.preventDefault(); Q.ctxMenu(ev.clientX, ev.clientY, [['load', 'Dodaj obciążenie…'], ['brace', 'Stężenia…'], ['sup', `Warunki podparcia (${svg.dataset.pl === 'y' ? 'x–z' : 'x–y'})…`], ['sec', 'Przekrój…'], ['base', 'Podstawa słupa…']], a => { if (a === 'load') A.loadPopup(null, { pl: svg.dataset.pl }); else if (a === 'brace') A.bracesPopup(); else if (a === 'sup') A.supportPopup(svg.dataset.pl); else if (a === 'sec') A.secPopup(); else A.basePopup(); }); }));
+  // wykresy: klik – siły i sprawdzenia na wysokości x
+  $$('.schemesvg .mhit, .schemesvg .dgm', el).forEach(r => r.addEventListener('click', ev => { ev.stopPropagation(); const svg = r.closest('svg'); BS.W3.atXPopup(xOfEv(svg, ev)); }));
+  $$('svg.schemesvg', el).forEach(svg => svg.addEventListener('contextmenu', ev => { ev.preventDefault(); const x = xOfEv(svg, ev), pl = svg.dataset.pl; Q.ctxMenu(ev.clientX, ev.clientY, [['at', `Siły i sprawdzenia na x = ${fmt(x / 1000, 2)} m…`], ['load', 'Dodaj obciążenie w tym miejscu…'], ['brace', 'Dodaj stężenie w tym miejscu…'], ['-'], ['sup', `Warunki podparcia (${pl === 'y' ? 'x–z' : 'x–y'})…`], ['schemes', 'Schematy typowe…'], ['sec', 'Przekrój…'], ['base', 'Podstawa słupa…']], a => {
+    if (a === 'at') BS.W3.atXPopup(x); else if (a === 'load') A.loadPopup(null, { x: Math.round(x / 50) * 0.05, pl }); else if (a === 'brace') { S.stezenia.push({ x: Math.round(x / 50) * 0.05, pl, wys: 'srodek', skret: false }); changed(true); A.bracesPopup(S.stezenia.length - 1); } else if (a === 'sup') A.supportPopup(pl); else if (a === 'schemes') A.schemesPopup(); else if (a === 'sec') A.secPopup(); else A.basePopup();
+  }); }));
+  // legenda i zestawienie obciążeń
+  $$('[data-lgon]', el).forEach(cb => cb.addEventListener('change', () => { const L = S.obciazenia[+cb.dataset.lgon]; if (L) { L.aktywne = cb.checked; changed(true); } }));
+  $$('[data-lgopen]', el).forEach(b => { b.addEventListener('click', () => A.loadPopup(+b.dataset.lgopen)); b.addEventListener('contextmenu', ev => { ev.preventDefault(); loadMenu(+b.dataset.lgopen, ev.clientX, ev.clientY); }); });
+  $$('[data-openload]', el).forEach(tr => { tr.addEventListener('click', e => { if (e.target.closest('input')) return; A.loadPopup(+tr.dataset.openload); }); tr.addEventListener('contextmenu', ev => { ev.preventDefault(); loadMenu(+tr.dataset.openload, ev.clientX, ev.clientY); }); });
+  $$('[data-loff]', el).forEach(cb => cb.addEventListener('change', () => { S.obciazenia[+cb.dataset.loff].aktywne = cb.checked; changed(true); }));
+  $$('[data-addl]', el).forEach(b => b.addEventListener('click', () => addLoadOf(b.dataset.addl)));
 }
 
 /* ================================================================ ZAKŁADKI */
@@ -518,12 +593,37 @@ async function openFile() {
   if (inHost()) { const r = await hostCall('open', { filter: 'project' }); if (r && r.ok) loadProject(r.content, r.path); else if (r && r.err) Q.toast('Błąd odczytu: ' + r.err); return; }
   const inp = $('#fileIn'); inp.value = ''; inp.onchange = () => { const f = inp.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => loadProject(rd.result, f.name); rd.readAsText(f); }; inp.click();
 }
+// nowy projekt: pusty lub przykład (jak w BelkaStal: Ctrl+N)
+function startState(kind) {
+  const st = J.defaultState();
+  if (kind === 'empty') {
+    st.meta = Object.assign(st.meta, { nazwa: 'Słup S-1', obiekt: '', opis: '' });
+    st.obciazenia = []; st.stezenia = [];
+  } else if (kind === 'pp') {
+    st.meta = Object.assign(st.meta, { nazwa: 'Słup S-2', obiekt: 'Budynek – słup wewnętrzny', opis: 'Słup wewnętrzny przegubowy, rama stężona; reakcje z podciągów z mimośrodem.' });
+    J.applyScheme(st, 'pp'); st.geom.H = 4.2;
+    st.przekroj = Object.assign({}, st.przekroj, { typ: 'walc', seria: 'HEB', nr: P.lista('HEB').includes(200) ? 200 : P.lista('HEB')[0] });
+    st.stezenia = [];
+    st.obciazenia = [
+      { id: 'G1', nazwa: 'Stropy i ściany (reakcje podciągów)', rodzaj: 'G', kat: 'Q-B', wyklucz: '', aktywne: true, sklad: [{ typ: 'N', x: '', F: 420, ey: 0, ez: 100 }] },
+      { id: 'Q1', nazwa: 'Użytkowe – biura', rodzaj: 'Q', kat: 'Q-B', wyklucz: '', aktywne: true, sklad: [{ typ: 'N', x: '', F: 260, ey: 0, ez: 100 }] },
+    ];
+    st.podstawa.aktywna = false;
+  }
+  return J.normalize(st);
+}
 async function newProject() {
   if (dirty && !(await Q.ask('Niezapisane zmiany zostaną utracone. Utworzyć nowy projekt?', 'Nowy projekt'))) return;
-  S = J.defaultState(); COLS = null; curC = 0; filePath = ''; dirty = false;
-  $('#projName').value = S.meta.nazwa; rendered = {}; renderInputs(); recalc(); updateTitle(); autosave();
+  const card = (k, t, s) => `<button class="card" data-np="${k}" type="button" style="text-align:left;cursor:pointer;display:block;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit"><b>${t}</b><br><small class="hint">${s}</small></button>`;
+  const m = Q.modal(`<h3>Nowy projekt</h3><div style="display:grid;gap:8px">${card('ex', 'Przykład – słup hali (utwierdzony, wiatr, dźwigar)', 'HEA 280, H = 6 m, obciążenia stałe, śnieg i wiatr (dwa kierunki), stężenie pasa, podstawa utwierdzona z kotwami.')}${card('pp', 'Przykład – słup wewnętrzny przegubowy', 'HEB 200, H = 4,2 m, rama stężona, reakcje z podciągów z mimośrodem 100 mm.')}${card('empty', 'Pusty projekt', 'Domyślny przekrój i schemat, bez obciążeń (ciężar własny – automatycznie). Obciążenia dodaj przyciskiem „+ Obciążenie” lub w zestawieniu.')}</div><div class="dbtn"><span style="flex:1"></span><button class="btn" id="npC" type="button">Anuluj</button></div>`, 'sm');
+  $('#npC', m).onclick = Q.closeModal;
+  $$('[data-np]', m).forEach(b => b.addEventListener('click', () => {
+    Q.closeModal();
+    S = startState(b.dataset.np); COLS = null; curC = 0; filePath = ''; dirty = false; schCombo = null;
+    $('#projName').value = S.meta.nazwa; rendered = {}; renderInputs(); recalc(); updateTitle(); autosave(); A.selectTab('data');
+  }));
 }
-function doPrint() { A.selectTab('report'); setTimeout(() => BS.V.printReport(), 120); }
+function doPrint() { A.selectTab('report'); setTimeout(() => BS.V.printReport(), 150); }
 function about() {
   Q.modal(`<h3>SłupStal ${esc(BS.VERSION)}</h3><p>Projektowanie słupów stalowych według Eurokodów: PN-EN 1990, PN-EN 1991, PN-EN 1993-1-1 (analiza I/II rzędu, imperfekcje, klasyfikacja, nośność przekroju, wyboczenie giętne, skrętne i giętno-skrętne, zwichrzenie, interakcja wg zał. A i B, metoda ogólna), PN-EN 1993-1-5 (klasa 4), PN-EN 1993-1-8 (podstawa słupa – metoda składnikowa), PN-EN 1993-1-2 (pożar), PN-EN 1993-1-10 (kruche pękanie), PN-EN 1090-2 (klasa wykonania).</p>
   <p>Obciążenia krytyczne, długości wyboczeniowe, moment krytyczny i analiza II rzędu – metoda elementów skończonych (pręt Eulera–Bernoulliego, teoria Własowa) dla rzeczywistych warunków podparcia, stężeń i rozkładów sił. Każdy wynik ma tok obliczeń (wzór, podstawienie, punkt normy); każdy parametr można nadpisać ręcznie.</p>

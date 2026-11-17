@@ -104,6 +104,8 @@ func filterFor(kind string) filterDef {
 		return filterDef{[]string{"Raport HTML (*.html)", "*.html;*.htm", "Wszystkie pliki (*.*)", "*.*"}, "html"}
 	case "odt":
 		return filterDef{[]string{"Dokument OpenDocument (*.odt)", "*.odt", "Wszystkie pliki (*.*)", "*.*"}, "odt"}
+	case "dxf":
+		return filterDef{[]string{"Rysunek DXF (*.dxf)", "*.dxf", "Wszystkie pliki (*.*)", "*.*"}, "dxf"}
 	case "json":
 		return filterDef{[]string{"Dane JSON (*.json)", "*.json", "Wszystkie pliki (*.*)", "*.*"}, "json"}
 	default:

@@ -32,7 +32,7 @@ V.sec = function (el) {
   const sec = r.sec, b = r.base, mat = r.mat;
   const q = r.checks.find(c => c.id === 'MN');
   const e = q && q.d ? q.d.e : { N: 0, My: 0, Mz: 0 };
-  let h = head(el, 'Przekrój i nośność', 'kliknij przekrój – zmiana; wiersz sprawdzenia – tok obliczeń');
+  let h = head(el, 'Przekrój i nośność', 'kliknij pas / środnik – wymiary tej części; wiersz sprawdzenia – tok obliczeń; wykres η(x) – przekrój na tej wysokości');
   h += `<div class="rebbar"><button class="btn sm pri" id="dsSec" type="button">⚙ Dobierz przekrój</button><button class="btn sm" data-act="secwin" type="button">Przekrój i materiał…</button><button class="btn sm" data-act="sectab" type="button">Tablica kształtowników…</button></div>`;
   h += `<div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">`;
   h += `<div class="box"><h4>${esc(sec.nazwa)} · ${esc(mat.gatunek + mat.podgatunek)} · f<sub>y</sub> = ${fmt(mat.fy, 0)} MPa</h4>${D.section(sec, { size: 260, zones: true, sigma: q ? { N: e.N, My: e.My, Mz: e.Mz } : null, fy: mat.fy, eff: b.effN || b.effMy })}<p class="hint">σ – naprężenia sprężyste w miejscu najbardziej wytężonym (N + M<sub>y</sub>; przerywana – z M<sub>z</sub>).</p>${RP.secTable(sec)}</div>`;
@@ -44,25 +44,33 @@ V.sec = function (el) {
     <h4 style="margin-top:12px">Klasa przekroju · ε = ${fmt(b.eps, 3)}</h4><p class="hint">Ściskanie: klasa ${b.kN.cls} · zginanie M<sub>y</sub>: ${b.kMy.cls} · zginanie M<sub>z</sub>: ${b.kMz.cls}${q ? ` · w miejscu decydującym (N + M): <b>${q.d.p.cls}</b>` : ''}</p>${RP.classTable(q ? q.d.cx.k : b.kN)}</div></div>`;
   // wytężenie przekroju na wysokości
   const xs = Array.from(r.an.xs3).map(x => x / 1000), Hm = r.md.H / 1000;
-  h += `<div class="fig" style="margin-top:12px">${D.heightChart({ W: 300, H: 380, Hm, title: 'Wytężenie przekroju η(x) – obwiednia', unit: 'η [%]', dp: 0, series: [{ x: xs, v: Array.from(r.env.uSec).map(v => v * 100), c: '#c0262d', fill: '#c0262d', l: 'η' }], vlines: [{ v: 100, c: '#1d7f3c', l: '100%' }] })}<div style="flex:1;min-width:360px"><h4>Sprawdzenia przekroju (PN-EN 1993-1-1, 6.2)</h4>${tableChecks(r.checks.filter(c => /^Nośność przekroju/.test(c.grp)))}</div></div>`;
-  el.innerHTML = h; bindHead(el); bindChecks(el); D.bindHeight(el);
+  const x0 = secX === null ? (r.checks.find(c => c.id === 'MN') || {}).x : secX;
+  const hsBox = `<div class="box hsec" style="min-width:300px;max-width:420px"><div class="secx"><b>Przekrój na wysokości</b> x =<input class="txt" id="secX" value="${fmt((x0 || 0) / 1000, 2)}" autocomplete="off"> m <button class="btn sm" data-sx="max" type="button">miejsce decydujące</button><button class="btn sm" data-sx="0" type="button">podstawa</button><button class="btn sm" data-sx="H" type="button">głowica</button><span class="hint" style="margin:0">lub kliknij wykres η(x)</span></div><div id="secHs">${BS.W3.hsecHTML(S(), r, x0 || 0).replace(/<h4>.*?<\/h4>/, "")}</div></div>`;
+  h += `<div class="fig" style="margin-top:12px">${D.heightChart({ W: 300, H: 380, Hm, title: 'Wytężenie przekroju η(x) – obwiednia', unit: 'η [%]', dp: 0, series: [{ x: xs, v: Array.from(r.env.uSec).map(v => v * 100), c: '#c0262d', fill: '#c0262d', l: 'η' }], vlines: [{ v: 100, c: '#1d7f3c', l: '100%' }] })}${hsBox}<div style="flex:1;min-width:360px"><h4>Sprawdzenia przekroju (PN-EN 1993-1-1, 6.2)</h4>${tableChecks(r.checks.filter(c => /^Nośność przekroju/.test(c.grp)))}</div></div>`;
+  el.innerHTML = h; bindHead(el); bindChecks(el);
+  const setX = (xmm) => { const r2 = R(); xmm = Math.max(0, Math.min(r2.md.H, xmm)); secX = xmm; const i = $('#secX', el); if (i) i.value = fmt(xmm / 1000, 2); const hs = $('#secHs', el); if (hs) { hs.innerHTML = BS.W3.hsecHTML(S(), r2, xmm).replace(/<h4>.*?<\/h4>/, ""); Q.flash(hs); } };
+  A.setSecX = setX;
+  D.bindHeight(el, ym => setX(ym * 1000));
+  $$('svg.hchart', el).forEach(svg => svg.addEventListener('click', ev => { if (ev.target.closest('.pinlab')) return; const c = D.HCH[svg.dataset.cid]; if (!c) return; const rr = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal, py = (ev.clientY - rr.top) * vb.height / rr.height, ym = (1 - (py - c.mt) / (c.H - c.mt - c.mb)) * c.Hm; if (ym >= 0 && ym <= c.Hm) setX(ym * 1000); }));
+  const si = $('#secX', el); if (si) si.addEventListener('change', () => { const v = Q.parseNum(si.value); if (v !== null) setX(v * 1000); });
+  $$('[data-sx]', el).forEach(b => b.addEventListener('click', () => { const k = b.dataset.sx, r2 = R(); setX(k === 'max' ? ((r2.checks.find(c => c.id === 'MN') || {}).x || 0) : k === 'H' ? r2.md.H : 0); }));
   $$('[data-act]', el).forEach(bt => bt.addEventListener('click', () => A.doAct(bt.dataset.act)));
   const ds = $('#dsSec', el); if (ds) ds.onclick = () => A.runDesign('sec');
-  $$('.zhit', el).forEach(z => z.addEventListener('click', () => A.secPopup()));
+  $$('.zhit', el).forEach(z => { z.addEventListener('click', ev => { ev.stopPropagation(); A.secPopup(z.dataset.z); }); z.addEventListener('contextmenu', ev => { ev.preventDefault(); Q.ctxMenu(ev.clientX, ev.clientY, [['sec', 'Przekrój i materiał…'], ['tab', 'Tablica kształtowników…'], ['des', '⚙ Dobierz przekrój']], a => { if (a === 'sec') A.secPopup(z.dataset.z); else if (a === 'tab') A.secTablePopup(); else A.runDesign('sec'); }); }); });
 };
 
 /* ================================================================ WYKRESY */
-let chCombo = 'env', chVar = 0;
+let chCombo = 'env', chVar = 0, secX = null;
 V.chart = function (el) {
   const r = R();
   if (!r || !r.res || !r.res.length) { el.innerHTML = head(el, 'Wykresy') + errBox(); bindHead(el); return; }
   const xs = Array.from(r.an.xs3).map(x => x / 1000), Hm = r.md.H / 1000;
   const opts = `<option value="env" ${chCombo === 'env' ? 'selected' : ''}>obwiednia SGN (wszystkie kombinacje i warianty)</option>` + r.res.map((cr, i) => `<option value="${i}" ${String(chCombo) === String(i) ? 'selected' : ''}>${esc(cr.combo.id)}: ${esc(cr.combo.opis)}</option>`).join('');
-  let h = head(el, 'Wykresy sił wewnętrznych i przemieszczeń na wysokości słupa', 'najedź kursorem – wartości na danej wysokości na wszystkich wykresach');
+  let h = head(el, 'Wykresy sił wewnętrznych i przemieszczeń na wysokości słupa', 'najedź kursorem – wartości na wszystkich wykresach; kliknij – znacznik (ponownie – usuń); kliknij etykietę znacznika – siły i sprawdzenia w tym miejscu');
   h += `<div class="rebbar"><span class="ttl">Kombinacja:</span><select id="chC">${opts}</select>`;
   const cr = chCombo === 'env' ? null : r.res[+chCombo];
   if (cr && cr.variants.length > 1) h += `<select id="chV">${cr.variants.map((v, i) => `<option value="${i}" ${i === chVar ? 'selected' : ''}>${esc(v.lab)}</option>`).join('')}</select>`;
-  h += '</div>';
+  h += `<button class="btn sm" id="pinClr" type="button" title="Usuń wszystkie znaczniki z wykresów (także prawy przycisk na wykresie)">Usuń znaczniki</button><button class="btn sm" id="chSch" type="button" title="Pokaż tę kombinację na schemacie w zakładce Dane">Na schemacie →</button></div>`;
   const W = 236, H = 400;
   const hc = (o) => D.heightChart(Object.assign({ W, H, Hm }, o));
   let charts = '';
@@ -85,7 +93,8 @@ V.chart = function (el) {
     h += `<p class="hint">α<sub>cr</sub>: ${fmt(cr.aC.y, 2)} (x–z) / ${fmt(cr.aC.z, 2)} (x–y) · H<sub>Ed</sub>/V<sub>Ed</sub>: ${fmt(cr.hv.y.r, 3)} / ${fmt(cr.hv.z.r, 3)}${r.method !== 'I' ? ` · imperfekcja przechyłowa φ: ${cr.phiAct.y ? 'x–z ' : ''}${cr.phiAct.z ? 'x–y' : ''}${!cr.phiAct.y && !cr.phiAct.z ? 'pominięta (H_Ed ≥ 0,15 V_Ed lub brak postaci przechyłowej)' : ''}` : ''}</p>`;
   }
   h += `<div class="fig">${charts}</div>`;
-  el.innerHTML = h; bindHead(el); D.bindHeight(el);
+  el.innerHTML = h; bindHead(el); D.bindHeight(el, ym => BS.W3.atXPopup(ym * 1000));
+  $('#chSch', el).onclick = () => { A.setSchCombo(chCombo === 'env' ? null : +chCombo); A.selectTab('data'); };
   $('#chC', el).addEventListener('change', e => { chCombo = e.target.value; chVar = 0; A.invalidate('chart'); A.renderActive(); });
   const cv = $('#chV', el); if (cv) cv.addEventListener('change', e => { chVar = +e.target.value; A.invalidate('chart'); A.renderActive(); });
 };
@@ -112,6 +121,9 @@ V.stab = function (el) {
   if (r.general) h += `<p class="hint">Metoda ogólna: α<sub>ult,k</sub> = ${fmt(r.general.aUlt, 3)}, α<sub>cr,op</sub> = ${fmt(r.general.aCr, 3)}, λ̄<sub>op</sub> = ${fmt(r.general.lop, 3)}, χ<sub>op</sub> = ${fmt(r.general.chiOp, 3)}.</p>`;
   el.innerHTML = h; bindHead(el); bindChecks(el);
 };
+
+/* ================================================================ SŁUP I PODSTAWA (2D / 3D) */
+V.elev = function (el) { BS.W3.render(el); };
 
 /* ================================================================ PODSTAWA */
 V.base = function (el) {
@@ -171,64 +183,131 @@ V.sum = function (el) {
   if (nF.length) h += `<div class="failnav">Niespełnione warunki: ${c.map((x, i) => x.status === 'fail' && !x.info ? `<button class="goto" data-goto="${i}" type="button">${sym(x.n)}</button>` : '').join('')}</div>`;
   const isOk = (x) => x.info || x.status === 'ok', nOk = c.filter(isOk).length;
   h += `<div class="tickbar"><span>Spełnione: <b>${nOk}</b> z ${c.length}</span><span class="hint">Znaczniki ✓ ustawiane automatycznie przy każdej zmianie danych. Kliknij punkt normy – objaśnienie; kliknij warunek – jak obliczono (wzór, podstawienie, wynik).</span></div>`;
-  h += `<div class="tscroll"><table class="ctab"><thead><tr><th class="tk">✓</th><th>Sprawdzenie</th><th>Punkt normy</th><th style="text-align:right">Warunek</th><th>Wykorzystanie</th><th>Status</th></tr></thead><tbody>`;
+  h += `<div class="tscroll"><table class="ctab"><thead><tr><th class="tk">✓</th><th>Sprawdzenie</th><th>Punkt normy</th><th style="text-align:right">Warunek</th><th>Wykorzystanie</th><th>Status</th><th></th></tr></thead><tbody>`;
   let grp = '';
   c.forEach((x, i) => {
-    if (x.grp !== grp) { grp = x.grp; h += `<tr class="g"><td colspan="6">${esc(grp)}</td></tr>`; }
+    if (x.grp !== grp) { grp = x.grp; h += `<tr class="g"><td colspan="7">${esc(grp)}</td></tr>`; }
     const on = isOk(x);
     const u = x.util !== null && isFinite(x.util) ? x.util : (x.status === 'fail' ? Infinity : 0);
     const bw = Math.min(100, (isFinite(u) ? u : 1) * 100);
-    h += `<tr class="${on ? 'done' : ''}" data-ci="${i}"><td class="tk"><input type="checkbox" data-tick="${i}" ${on ? 'checked' : ''} tabindex="-1" aria-readonly="true"></td><td>${sym(x.n)}${x.combo ? `<br><small class="hint">${esc(x.combo)}</small>` : ''}</td><td><button class="nref lnk" data-ref="${i}" type="button">${esc(x.ref)}</button></td><td class="val" style="text-align:right">${x.unit === '-' ? (x.info ? fmt(x.Rd, 2) : fmt(x.util, 3) + ' ≤ 1') : `${unitV(x.Ed, x.unit)} ${u <= 1 ? '≤' : '>'} ${unitV(x.Rd, x.unit)}`}</td><td class="bar"><span style="display:inline-block;width:90px;height:8px;border-radius:4px;background:var(--line2);vertical-align:middle;margin-right:6px;overflow:hidden"><span style="display:block;height:100%;width:${bw}%;background:var(--${x.info ? 'info' : u > 1 ? 'fail' : u > 0.9 ? 'warn' : 'ok'})"></span></span><b>${isFinite(u) ? fmt(u * 100, 0) + '%' : '∞'}</b></td><td>${stc(x)}</td></tr>`;
+    h += `<tr class="${on ? 'done' : ''}" data-ci="${i}"><td class="tk"><input type="checkbox" data-tick="${i}" ${on ? 'checked' : ''} tabindex="-1" aria-readonly="true"></td><td>${sym(x.n)}${x.combo ? `<br><small class="hint">${esc(x.combo)}</small>` : ''}</td><td><button class="nref lnk" data-ref="${i}" type="button">${esc(x.ref)}</button></td><td class="val" style="text-align:right">${x.unit === '-' ? (x.info ? fmt(x.Rd, 2) : fmt(x.util, 3) + ' ≤ 1') : `${unitV(x.Ed, x.unit)} ${u <= 1 ? '≤' : '>'} ${unitV(x.Rd, x.unit)}`}</td><td class="bar"><span style="display:inline-block;width:90px;height:8px;border-radius:4px;background:var(--line2);vertical-align:middle;margin-right:6px;overflow:hidden"><span style="display:block;height:100%;width:${bw}%;background:var(--${x.info ? 'info' : u > 1 ? 'fail' : u > 0.9 ? 'warn' : 'ok'})"></span></span><b>${isFinite(u) ? fmt(u * 100, 0) + '%' : '∞'}</b></td><td>${stc(x)}</td><td class="go"><button class="gobtn" data-gom="${i}" type="button" title="Przejdź do danych / wyników, od których zależy ten warunek">pokaż →</button></td></tr>`;
   });
   h += '</tbody></table></div>';
   el.innerHTML = h; bindHead(el); bindChecks(el);
   $$('[data-tick]', el).forEach(cb => cb.addEventListener('click', ev => ev.preventDefault()));
   $$('[data-goto]', el).forEach(b => b.addEventListener('click', () => A.explainPopup(c[+b.dataset.goto])));
+  $$('[data-gom]', el).forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); A.gotoCheck(c[+b.dataset.gom]); }));
   $$('[data-gck]', el).forEach(d => d.addEventListener('click', () => { const x = c.find(q => q.id === d.dataset.gck); if (x) A.explainPopup(x); }));
 };
 
 /* ================================================================ RAPORT */
-let repMode = 'full', repRefs = true;
+/* raport: pełny / statyka / własny (edytowalny, zapisywany w projekcie); druk w oknie programu (nagłówek/stopka stron przez tabelę .pwrap) */
+const wrapPrint = (html) => `<table class="pwrap"><thead><tr><td><div class="psp"></div></td></tr></thead><tfoot><tr><td><div class="psp"></div></td></tr></tfoot><tbody><tr><td class="pbody">${html}</td></tr></tbody></table>`;
+const repMode = () => (S().meta.repMode === 'stat' ? 'stat' : 'full');
+const repView = () => (S().meta.repMode === 'own' ? 'own' : repMode());
+const refsOn = () => S().meta.repRefs !== false;
+const repOk = () => { const r = R(); return !!(r && r.sec && r.md && r.env && !r.errors.length); };
+const repBuild = (mode) => { const m = mode || repMode(), r = R(), st = S(); const h = m === 'stat' ? RP.statics(st, r) : RP.build(st, r, { refs: refsOn() }); return !refsOn() && BS.ODT.noRefs ? BS.ODT.noRefs(h) : h; };
+function cleanHTML(html) {
+  const t = document.createElement('template'); t.innerHTML = html || '';
+  t.content.querySelectorAll('script, iframe, object, embed, link, meta, base, form, input, button, select, textarea').forEach(n => n.remove());
+  t.content.querySelectorAll('*').forEach(n => [...n.attributes].forEach(a => { if (/^on/i.test(a.name) || (/^(href|src|xlink:href)$/i.test(a.name) && /^\s*javascript:/i.test(a.value)) || a.name === 'contenteditable') n.removeAttribute(a.name); }));
+  return t.innerHTML;
+}
+const printNow = () => { A.selectTab('report'); setTimeout(() => window.print(), 80); };
 V.report = function (el) {
-  const r = R(), st = S();
-  let h = `<div class="rtools"><div class="segsw"><button class="${repMode === 'full' ? 'on' : ''}" data-rm="full" type="button">Raport pełny</button><button class="${repMode === 'stat' ? 'on' : ''}" data-rm="stat" type="button">Statyka</button></div><label class="chk sm"><input type="checkbox" id="rRefs" ${repRefs ? 'checked' : ''}><span>z odwołaniami do norm</span></label><button class="btn" id="rHtml" type="button">Zapisz raport HTML…</button><button class="btn" id="rOdt" type="button">Zapisz .odt (edytowalny)…</button><button class="btn pri" id="rPrint" type="button">Drukuj / zapisz PDF</button></div>`;
+  const view = repView();
+  const seg = `<div class="segsw" role="tablist" aria-label="Rodzaj raportu"><button data-rm="full" class="${view === 'full' ? 'on' : ''}" type="button" title="Pełny tok obliczeń: dane, podstawa normowa, przekrój, obciążenia i kombinacje, analiza globalna, wszystkie sprawdzenia SGN i SGU ze wzorami i podstawieniami, podstawa, pożar, zestawienie">Raport pełny</button><button data-rm="stat" class="${view === 'stat' ? 'on' : ''}" type="button" title="Tylko statyka: dane, schemat, obciążenia, kombinacje, siły wewnętrzne i reakcje">Statyka</button><button data-rm="own" class="${view === 'own' ? 'on' : ''}" type="button" title="Raport do własnej edycji: pisz, usuwaj fragmenty, wstawiaj raport obliczeń; zapisywany w pliku projektu">Raport własny</button></div>`;
+  const bindSeg = () => {
+    $$('[data-rm]', el).forEach(b => b.addEventListener('click', () => { S().meta.repMode = b.dataset.rm; A.markDirty(); V.report(el); }));
+    const rf = $('#rRefs', el); if (rf) rf.onchange = () => { S().meta.repRefs = rf.checked; A.markDirty(); V.report(el); };
+  };
+  if (view === 'own') { renderOwn(el, seg); bindSeg(); return; }
+  if (!repOk()) { el.innerHTML = `<div class="rtools">${seg}</div>` + errBox(); bindSeg(); return; }
   let body;
-  try { body = !r || !r.sec ? '<p>Brak wyników – usuń błędy danych.</p>' : repMode === 'stat' ? RP.statics(st, r) : RP.build(st, r, { refs: repRefs }); } catch (e) { console.error(e); body = `<div class="msg err">Błąd raportu: ${esc(e.message)}</div>`; }
-  h += `<div id="report">${body}</div>`;
-  el.innerHTML = h;
-  $$('[data-rm]', el).forEach(b => b.addEventListener('click', () => { repMode = b.dataset.rm; A.invalidate('report'); A.renderActive(); }));
-  $('#rRefs', el).addEventListener('change', e => { repRefs = e.target.checked; A.invalidate('report'); A.renderActive(); });
-  $('#rHtml', el).onclick = () => V.exportHTML(); $('#rOdt', el).onclick = () => V.exportODT(); $('#rPrint', el).onclick = () => V.printReport();
+  try { body = repBuild(); } catch (e) { console.error(e); body = `<div class="msg err">Błąd raportu: ${esc(e.message)}</div>`; }
+  el.innerHTML = `<div class="rtools">${seg}<span class="sp" style="flex:1"></span><label class="chk sm" title="Odwołania do punktów, tablic i wzorów norm w raporcie"><input type="checkbox" id="rRefs" ${refsOn() ? 'checked' : ''}><span>z odwołaniami do norm</span></label><button class="btn" id="rHtml" type="button" title="Raport HTML z danymi projektu (można go otworzyć w programie)">Zapisz raport HTML…</button><button class="btn" id="rOdt" type="button" title="OpenDocument Text (.odt) – LibreOffice Writer, MS Word">Zapisz .odt (edytowalny)…</button><button class="btn pri" id="rPrint" type="button" title="Drukowanie raportu (także zapis do PDF – drukarka „Microsoft Print to PDF” / „Zapisz jako PDF”)">Drukuj / zapisz PDF</button></div><div id="report">${wrapPrint(body)}</div>`;
+  bindSeg();
+  $('#rHtml', el).onclick = () => V.exportHTML(); $('#rOdt', el).onclick = () => V.exportODT(); $('#rPrint', el).onclick = printNow;
 };
+let ownT = 0;
+const OWN_ON = 'Raport własny – zapisywany w projekcie przy każdej zmianie; nie zmienia się po zmianie danych (aktualne obliczenia: „Wstaw raport pełny” / „Wstaw statykę”).';
+function renderOwn(el, seg) {
+  const own = S().meta.ownOn === true;
+  if (!own && !repOk()) { el.innerHTML = `<div class="rtools">${seg}</div>` + errBox(); return; }
+  const B = (cmd, lab, tit, val) => `<button data-oc="${cmd}"${val ? ` data-ov="${val}"` : ''} title="${tit}" type="button">${lab}</button>`;
+  el.innerHTML = `<div class="rtools">${seg}<span class="sp" style="flex:1"></span><button class="btn" id="oExp" type="button">Zapisz HTML…</button><button class="btn" id="oOdt" type="button" title="OpenDocument Text – LibreOffice Writer, MS Word">Zapisz .odt…</button><button class="btn pri" id="oPrint" type="button">Drukuj / PDF</button></div><div class="rtools owntools">
+      <span class="grp">${B('bold', '<b>B</b>', 'Pogrubienie (Ctrl+B)')}${B('italic', '<i>I</i>', 'Kursywa (Ctrl+I)')}${B('underline', '<u>U</u>', 'Podkreślenie (Ctrl+U)')}${B('removeFormat', 'T̸', 'Usuń formatowanie zaznaczenia')}</span>
+      <span class="grp">${B('formatBlock', 'H1', 'Tytuł', 'h1')}${B('formatBlock', 'H2', 'Nagłówek rozdziału', 'h2')}${B('formatBlock', 'H3', 'Podtytuł', 'h3')}${B('formatBlock', '¶', 'Zwykły akapit', 'p')}${B('insertUnorderedList', '•', 'Lista punktowana')}${B('insertOrderedList', '1.', 'Lista numerowana')}</span>
+      <span class="grp">${B('undo', '↶', 'Cofnij (Ctrl+Z)')}${B('redo', '↷', 'Ponów (Ctrl+Y)')}</span>
+      <button class="btn sm" id="oIns" type="button" title="Wstawia pełny raport obliczeń (aktualne dane) za akapitem z kursorem">Wstaw raport pełny</button>
+      <button class="btn sm" id="oInsS" type="button" title="Wstawia raport statyki (aktualne dane) za akapitem z kursorem">Wstaw statykę</button>
+      <button class="btn sm" id="oSum" type="button" title="Wstawia tabelę wyników (wszystkie warunki z wytężeniem)">Wstaw zestawienie wyników</button>
+      <button class="btn sm" id="oDate" type="button" title="Wstawia datę i nazwę elementu w miejscu kursora">Wstaw datę</button>
+      <button class="btn sm" id="oReset" type="button" ${own ? '' : 'disabled'} title="Usuwa własne zmiany – raport własny znowu pokazuje bieżący raport obliczeń">Przywróć raport obliczeń</button>
+      <button class="btn sm" id="oClr" type="button" title="Usuwa całą treść raportu własnego">Wyczyść</button></div>
+    <p class="ownstate" id="oState">${own ? OWN_ON : 'Podgląd bieżącego raportu obliczeń – kliknij w tekst i pisz albo usuwaj (zaznacz i Delete); po pierwszej zmianie raport staje się Twoją kopią zapisywaną w projekcie.'}</p>
+    <div class="ownwrap">${wrapPrint(`<div id="ownrep" contenteditable="true" spellcheck="true" lang="pl">${own ? cleanHTML(S().meta.own || '') : repBuild('full')}</div>`)}</div>`;
+  const ed = $('#ownrep', el), st = $('#oState', el);
+  const save = () => { clearTimeout(ownT); ownT = setTimeout(() => { S().meta.own = ed.innerHTML; S().meta.ownOn = true; A.markDirty(); st.textContent = OWN_ON; const rb = $('#oReset', el); if (rb) rb.disabled = false; }, 350); };
+  ed.addEventListener('input', save);
+  ed.addEventListener('focus', () => { try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) { /* */ } });
+  $$('[data-oc]', el).forEach(b => { b.addEventListener('mousedown', ev => ev.preventDefault()); b.addEventListener('click', () => { ed.focus(); try { document.execCommand(b.dataset.oc, false, b.dataset.ov ? `<${b.dataset.ov}>` : null); } catch (e) { /* */ } save(); }); });
+  const insertAtCaret = (html) => {
+    const sel = window.getSelection(), inEd = sel && sel.rangeCount && ed.contains(sel.getRangeAt(0).commonAncestorContainer);
+    const t = document.createElement('template'); t.innerHTML = html; const frag = t.content;
+    const isBlock = [...frag.childNodes].some(n => n.nodeType === 1 && /^(h[1-6]|div|table|p|ul|ol)$/i.test(n.tagName) && !(frag.childNodes.length === 1 && /^p$/i.test(n.tagName)));
+    if (inEd && isBlock) { let top = sel.getRangeAt(0).startContainer; while (top && top.parentNode !== ed) top = top.parentNode; if (top && top !== ed) { const empty = top.nodeType === 1 ? !top.textContent.trim() && !top.querySelector('svg, img, table') : !top.nodeValue.trim(); ed.insertBefore(frag, top.nextSibling); if (empty) top.remove(); } else ed.appendChild(frag); }
+    else if (inEd) { const rg = sel.getRangeAt(0); rg.deleteContents(); rg.insertNode(frag); rg.collapse(false); } else ed.appendChild(frag);
+    save();
+  };
+  const insRep = (kind) => { if (!repOk()) { Q.toast('Usuń błędy danych – raport obliczeń jest niedostępny.'); return; } insertAtCaret(repBuild(kind)); Q.toast(kind === 'stat' ? 'Wstawiono raport statyki.' : 'Wstawiono raport obliczeń.', 1800); };
+  const sumTable = () => { const r = R(); if (!repOk()) return ''; return `<h2>Zestawienie wyników</h2><table class="rtab"><thead><tr><th>Sprawdzenie</th><th>Punkt normy</th><th>Wykorzystanie</th><th>Status</th></tr></thead><tbody>${r.checks.map(c => `<tr><td>${sym(c.n)}</td><td>${esc(c.ref || '')}</td><td>${c.util !== null && isFinite(c.util) ? fmt(c.util * 100, 0) + '%' : '—'}</td><td>${c.info ? 'informacja' : c.status === 'fail' ? 'niespełniony' : c.status === 'warn' ? 'uwaga' : 'spełniony'}</td></tr>`).join('')}</tbody></table>`; };
+  $('#oIns', el).onclick = () => insRep('full'); $('#oInsS', el).onclick = () => insRep('stat');
+  $('#oSum', el).onclick = () => { const h = sumTable(); if (h) insertAtCaret(h); else Q.toast('Brak wyników.'); };
+  $('#oDate', el).onclick = () => insertAtCaret(`<p>${esc(S().meta.nazwa || '')} – ${new Date().toLocaleDateString('pl-PL')}</p>`);
+  const rerender = () => { renderOwn(el, seg); $$('[data-rm]', el).forEach(b => b.addEventListener('click', () => { S().meta.repMode = b.dataset.rm; A.markDirty(); V.report(el); })); };
+  $('#oReset', el).onclick = async () => { if (!(await Q.ask('Usunąć własne zmiany? Raport własny znowu pokaże bieżący raport obliczeń.', 'Przywróć', true))) return; S().meta.own = ''; S().meta.ownOn = false; A.markDirty(); rerender(); };
+  $('#oClr', el).onclick = async () => { if (!(await Q.ask('Usunąć całą treść raportu własnego?', 'Wyczyść', true))) return; S().meta.own = ''; S().meta.ownOn = true; A.markDirty(); rerender(); };
+  $('#oPrint', el).onclick = printNow;
+  $('#oExp', el).onclick = () => exportOwn('html');
+  $('#oOdt', el).onclick = () => exportOwn('odt');
+}
+function ownHTML() { const ed = $('#ownrep'); return ed ? ed.innerHTML : (S().meta.ownOn ? cleanHTML(S().meta.own || '') : (repOk() ? repBuild('full') : '')); }
 function reportDoc(body, title) {
   const css = $('#appcss').textContent;
   const st = S();
   const data = JSON.stringify({ format: BS.FORMAT, program: `${BS.APP} ${BS.VERSION}`, silnik: BS.ENGINE, sha256: BS.J.hash(st), state: st }).replace(/<\//g, '<\\/');
   return `<!doctype html><html lang="pl" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title || 'Raport – ' + st.meta.nazwa)}</title><style>${css}\nhtml,body{height:auto}body{overflow:auto;padding:20px 16px;background:#fff}.rtools{margin-bottom:14px}@media print{body{padding:0}.rtools{display:none}}</style></head><body>` +
-    `<div class="rtools"><button class="btn pri" onclick="window.print()">Drukuj / zapisz PDF</button><span class="hint">Plik zawiera dane projektu – można go otworzyć w programie SłupStal (Otwórz).</span></div><div id="report">${body}</div><script type="application/json" id="slupstal-data">${data}<\/script></body></html>`;
+    `<div class="rtools"><button class="btn pri" onclick="window.print()">Drukuj / zapisz PDF</button><span class="hint">Plik zawiera dane projektu – można go otworzyć w programie SłupStal (Otwórz).</span></div><div id="report">${wrapPrint(body)}</div><script type="application/json" id="slupstal-data">${data}<\/script></body></html>`;
 }
-const repBody = () => { const r = R(), st = S(); return !r || !r.sec ? '' : repMode === 'stat' ? RP.statics(st, r) : RP.build(st, r, { refs: repRefs }); };
-V.exportHTML = async function () {
-  const r = R(); if (!r || r.errors.length) { Q.toast('Usuń błędy danych przed eksportem raportu.'); return; }
-  const name = A.safeName(repMode === 'stat' ? ' – statyka.html' : ' – raport.html');
-  const content = reportDoc(repBody());
-  if (A.inHost()) { const res = await A.hostCall('save', { path: '', name, content, filter: 'html' }); if (res && res.ok) Q.toast('Zapisano raport: ' + A.baseName(res.path)); else if (res && res.err) Q.toast('Błąd zapisu: ' + res.err); return; }
+async function saveText(name, content, filter) {
+  if (A.inHost()) { const res = await A.hostCall('save', { path: '', name, content, filter }); if (res && res.ok) Q.toast('Zapisano raport: ' + A.baseName(res.path)); else if (res && res.err) Q.toast('Błąd zapisu: ' + res.err); return; }
   A.download(name, content, 'text/html');
-};
-V.exportODT = async function () {
-  const r = R(); if (!r || r.errors.length) { Q.toast('Usuń błędy danych przed eksportem raportu.'); return; }
-  Q.toast('Tworzenie pliku .odt…', 8000);
-  let html = repBody(); if (!repRefs && BS.ODT.noRefs) html = BS.ODT.noRefs(html);
-  const u = await BS.ODT.odt(html, S().meta.nazwa);
-  const name = A.safeName(' – raport.odt');
+}
+async function saveODT(name, html, title) {
+  Q.toast('Tworzenie pliku .odt…', 4000);
+  let u; try { u = await BS.ODT.odt(html, title); } catch (e) { console.error(e); Q.toast('Błąd tworzenia .odt: ' + e.message); return; }
   if (A.inHost()) { let b = ''; for (let i = 0; i < u.length; i += 0x8000) b += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); const res = await A.hostCall('save', { path: '', name, content: btoa(b), b64: true, filter: 'odt' }); if (res && res.ok) Q.toast('Zapisano raport: ' + A.baseName(res.path)); else if (res && res.err) Q.toast('Błąd: ' + res.err); return; }
   A.download(name, new Blob([u], { type: 'application/vnd.oasis.opendocument.text' }));
+}
+function exportOwn(kind) {
+  const html = ownHTML(), title = (S().meta.nazwa || 'Słup') + ' – raport';
+  if (kind === 'html') return saveText(A.safeName(' – raport własny.html'), reportDoc(html, title), 'html');
+  return saveODT(A.safeName(' – raport własny.odt'), html, title);
+}
+V.exportHTML = function () {
+  if (S().meta.repMode === 'own') return exportOwn('html');
+  if (!repOk()) { Q.toast('Usuń błędy danych przed eksportem raportu.'); return; }
+  const stt = repMode() === 'stat';
+  return saveText(A.safeName(stt ? ' – statyka.html' : ' – raport.html'), reportDoc(repBuild(), (S().meta.nazwa || 'Słup') + (stt ? ' – statyka' : ' – raport obliczeń')), 'html');
 };
-V.printReport = function () {
-  const r = R(); if (!r || !r.sec) { Q.toast('Brak wyników do wydruku.'); return; }
-  const w = window.open('', '_blank');
-  if (!w) { window.print(); return; }
-  w.document.open(); w.document.write(reportDoc(repBody())); w.document.close();
-  setTimeout(() => { try { w.focus(); w.print(); } catch (e) { /* */ } }, 400);
+V.exportODT = function () {
+  if (S().meta.repMode === 'own') return exportOwn('odt');
+  if (!repOk()) { Q.toast('Usuń błędy danych przed eksportem raportu.'); return; }
+  const stt = repMode() === 'stat';
+  return saveODT(A.safeName(stt ? ' – statyka.odt' : ' – raport.odt'), repBuild(), (S().meta.nazwa || 'Słup') + (stt ? ' – statyka' : ' – raport obliczeń'));
 };
+// druk: w oknie programu (WebView2 – okno drukowania systemu; PDF przez drukarkę PDF)
+V.printReport = function () { if (S().meta.repMode !== 'own' && !repOk()) { Q.toast('Brak wyników do wydruku – usuń błędy danych.'); return; } printNow(); };
 })();

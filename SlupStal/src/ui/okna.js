@@ -106,7 +106,8 @@ A.bracesPopup = function (focus) {
 };
 
 /* ---------------------------------------------------------------- przekrój */
-A.secPopup = function () {
+const ZONE_K = { fg: ['przekroj.bg', 'przekroj.tg', 'przekroj.nr', 'przekroj.b', 'przekroj.t'], fd: ['przekroj.bd', 'przekroj.td', 'przekroj.nr', 'przekroj.b', 'przekroj.t'], w: ['przekroj.tw', 'przekroj.h', 'przekroj.nr', 'przekroj.t'], all: ['przekroj.nr', 'przekroj.seria', 'przekroj.D', 'przekroj.t'] };
+A.secPopup = function (focus) {
   const st = S();
   const grp = A.GROUPS.find(g => g.id === 'sec');
   const draw = () => {
@@ -116,8 +117,23 @@ A.secPopup = function () {
       <div class="dbtn"><button class="btn" id="sTab" type="button">Tablica kształtowników…</button><button class="btn pri" id="sOk" type="button">Zamknij</button></div>`, 'secpop nofocus');
     A.bindFields(m, () => { A.recalcNow(); draw(); });
     $('#sOk', m).onclick = closeM; $('#sTab', m).onclick = () => A.secTablePopup();
+    $$('.zprev .zhit', m).forEach(z => z.addEventListener('click', () => hlZone(m, z.dataset.z)));
   };
+  const hlZone = (m, z) => { const ks = ZONE_K[z] || ZONE_K.all; Q.hlg(ks.map(k => $(`[data-k="${k}"]`, m)).filter(Boolean)); };
   A.setPopRedraw(null); draw();
+  if (focus) setTimeout(() => { const m = $('#modal'); if (m) hlZone(m, focus); }, 60);
+};
+/* ---------------------------------------------------------------- schematy typowe */
+A.schemesPopup = function () {
+  const st = S(), cur = J.schemeOf(st);
+  const big = (id) => D.pict(id).replace(/width="54" height="46"/, 'width="86" height="74"');
+  const nm = (t) => esc(t).replace(/M_(\w)/g, 'M<sub>$1</sub>');
+  const m = Q.modal(`<h3>Schematy typowe</h3><p class="hint">Wybór ustawia warunki podparcia w obu płaszczyznach (x–z: zginanie M<sub>y</sub>, wyboczenie względem y–y; x–y: zginanie M<sub>z</sub>, wyboczenie względem z–z). Wysokość, obciążenia, stężenia i przekrój pozostają bez zmian; podparcie można potem zmienić ręcznie (klik na podporze).</p>
+    <div class="schgal">${J.SCHEMATY.map(q => `<button class="card ${q.id === cur ? 'ok' : ''}" data-sch="${q.id}" type="button">${big(q.id)}<span>${nm(q.n)}</span></button>`).join('')}</div>
+    <div class="dbtn"><button class="btn" id="nSup" type="button">Warunki podparcia (własne)…</button><span style="flex:1"></span><button class="btn pri" id="nClose" type="button">Zamknij</button></div>`, 'nofocus');
+  m.querySelector('.dlg').style.maxWidth = '860px';
+  $('#nClose', m).onclick = closeM; $('#nSup', m).onclick = () => A.supportPopup('y');
+  $$('[data-sch]', m).forEach(b => b.addEventListener('click', () => { J.applyScheme(st, b.dataset.sch); closeM(); A.changed(true); Q.toast('Schemat: ' + J.SCHEMATY.find(q => q.id === b.dataset.sch).n); }));
 };
 A.secTablePopup = function () {
   const st = S();
@@ -211,14 +227,39 @@ A.normPopup = function (c) {
   const m = Q.modal(`<h3>${o ? esc(o.lab) + ' – ' + o.t : esc(c.ref)}</h3><p class="hint">${sym(c.n)}</p>${o ? `<p>${o.s}</p><p><b>${o.f}</b></p>${o.h ? `<p class="hint">${o.h}</p>` : ''}` : '<p class="hint">Brak objaśnienia dla tego punktu.</p>'}<p class="hint">Omówienie własne – nie jest cytatem normy.</p><div class="dbtn"><button class="btn" id="nEx" type="button">Jak obliczono…</button><button class="btn pri" id="nClose" type="button">Zamknij</button></div>`, 'norm');
   $('#nClose', m).onclick = closeM; $('#nEx', m).onclick = () => A.explainPopup(c);
 };
+const STL = { ok: 'spełniony', warn: 'uwaga', fail: 'niespełniony', info: 'informacja' };
+const unitV = (v, u) => (v === null || v === undefined || !isFinite(v) ? '—' : u === 'F' ? fmt(v / 1e3, 2) + ' kN' : u === 'M' ? fmt(v / 1e6, 2) + ' kNm' : u === 'mm' ? fmt(v, 1) + ' mm' : u === 'MPa' ? fmt(v, 1) + ' MPa' : u === '°C' ? fmt(v, 0) + ' °C' : fmt(v, 3));
+const ckCond = (c) => c.unit === '-' ? (c.info ? fmt(c.Rd, 2) : `${fmt(c.util, 3)} ≤ 1`) : `${unitV(c.Ed, c.unit)} ${c.util <= 1 ? '≤' : '>'} ${unitV(c.Rd, c.unit)}`;
+const utilBar = (c) => { const u = c.util !== null && isFinite(c.util) ? c.util : Infinity, w = Math.min(100, (isFinite(u) ? u : 1) * 100); return `<span style="display:inline-block;width:120px;height:9px;border-radius:5px;background:var(--line2);vertical-align:middle;margin-right:8px;overflow:hidden"><span style="display:block;height:100%;width:${w}%;background:var(--${u > 1 ? 'fail' : u > 0.9 ? 'warn' : 'ok'})"></span></span><b>${isFinite(u) ? fmt(u * 100, 0) + '%' : '∞'}</b>`; };
 A.explainPopup = function (c, back) {
   const r = R();
   const html = BS.Raport.frag(c, r, S());
-  const m = Q.modal(`<h3>Jak obliczono: ${sym(c.n)}</h3><div class="rexp xrep">${html}</div><div class="dbtn"><button class="btn" id="nNorm" type="button">Punkt normy…</button><button class="btn" id="nGo" type="button">Pokaż w raporcie</button>${back ? '<button class="btn" id="nBack" type="button">← Podstawa</button>' : ''}<button class="btn pri" id="nClose" type="button">Zamknij</button></div>`, 'expl');
-  $('#nClose', m).onclick = closeM; $('#nNorm', m).onclick = () => A.normPopup(c); $('#nGo', m).onclick = () => A.gotoCheck(c);
+  const st = c.info ? 'info' : c.status;
+  const m = Q.modal(`<h3>Jak obliczono: ${sym(c.n)}</h3><p class="hint">${esc(c.grp || '')}${c.ref ? ' · ' + esc(c.ref) : ''}${c.x !== undefined && c.x !== null && isFinite(c.x) ? ` · x = ${fmt(c.x / 1000, 2)} m` : ''}${c.combo ? ' · ' + esc(c.combo) : ''}</p>
+    <div class="xbox"><table class="kv"><tr><td>Warunek</td><td class="n"><b>${ckCond(c)}</b></td></tr><tr><td>Wytężenie</td><td>${utilBar(c)}</td></tr><tr><td>Status</td><td><span class="st ${st}">${STL[st] || st}</span></td></tr></table>${c.note ? `<p class="hint">${esc(c.note)}</p>` : ''}</div>
+    <div class="rexp xrep">${html}</div><div class="dbtn"><button class="btn" id="nNorm" type="button">Punkt normy…</button><button class="btn" id="nGo" type="button" title="Przejdź do danych / wyników, od których zależy ten warunek">Pokaż miejsce →</button><button class="btn" id="nRep" type="button">W raporcie</button>${back ? '<button class="btn" id="nBack" type="button">← Podstawa</button>' : ''}<span style="flex:1"></span><button class="btn pri" id="nClose" type="button">Zamknij</button></div>`, 'expl');
+  $('#nClose', m).onclick = closeM; $('#nNorm', m).onclick = () => A.normPopup(c); $('#nGo', m).onclick = () => A.gotoCheck(c); $('#nRep', m).onclick = () => A.gotoReport(c);
   if (back) $('#nBack', m).onclick = () => A.basePopup();
 };
+// „pokaż miejsce”: przejście do zakładki / pól danych, od których zależy warunek (jak w BelkaStal)
 A.gotoCheck = function (c) {
+  const id = c.id || '', grp = c.grp || '', r = R();
+  const ci = r && r.checks ? r.checks.indexOf(c) : -1;
+  const go = (tab, fn) => { closeM(); A.selectTab(tab); setTimeout(() => { try { if (fn) fn(); } catch (e) { console.error(e); } }, 90); };
+  const hl = (sel) => Q.hlg(sel);
+  const row = (tab) => () => hl(`#p-${tab} tr[data-ci="${ci}"]`) || hl(`#p-${tab} .box`);
+  const fields = (gid, keys) => () => { const d = $(`#inputs details[data-g="${gid}"]`); if (d) d.open = true; const els = keys.map(k => $(`#inputs [data-k="${k}"]`)).filter(Boolean); if (!hl(els)) hl(`#inputs details[data-g="${gid}"] summary`); };
+  if (id === 'acr') return go('data', fields('an', ['analiza.metoda', 'analiza.imp.m', 'analiza.imp.phi']));
+  if (/^(N|MN|Vy|Vz)$/.test(id)) return go('sec', () => { if (c.x !== undefined && c.x !== null && isFinite(c.x)) A.setSecX(c.x); if (!hl(`#p-sec tr[data-ci="${ci}"]`)) hl('#p-sec .zhit'); });
+  if (/^(By|Bz|BT|GM)$|^LT\d|^I6[12]_/.test(id)) return go('stab', row('stab'));
+  if (/^w[yz]$/.test(id)) return go('data', fields('sls', ['sgu.typ', id === 'wy' ? 'sgu.lim' : 'sgu.limZ']));
+  if (id === 'PBG') return go('data', () => A.basePopup());
+  if (/^PB/.test(id) || id === 'KRP') return go('base', row('base'));
+  if (id === 'FI' || /^Pożar/.test(grp)) return go('fire', row('fire'));
+  if (id === 'KR' || /^Kruche/.test(grp)) return go('data', fields('exe', ['kruche.Tmd', 'kruche.dTr']));
+  return A.gotoReport(c);
+};
+A.gotoReport = function (c) {
   closeM();
   A.selectTab('report');
   setTimeout(() => {

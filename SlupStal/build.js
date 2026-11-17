@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path');
 const R = (p) => fs.readFileSync(path.join(__dirname, p), 'utf8');
 const ENGINE = ['core', 'normy', 'materialy', 'przekroje', 'nosnosc', 'mes', 'model', 'kombinacje', 'statecznosc', 'podstawa', 'dodatkowe', 'projekt'];
-const UI = ['baza', 'rysunki', 'objasnienia', 'raport', 'odt', 'app', 'okna', 'widoki'];
+const UI = ['baza', 'rysunki', 'objasnienia', 'raport', 'odt', 'app', 'okna', 'widok3d', 'widoki'];
 const scripts = ENGINE.map(f => `<script>/* src/engine/${f}.js */\n${R('src/engine/' + f + '.js')}\n</script>`).concat(UI.map(f => `<script>/* src/ui/${f}.js */\n${R('src/ui/' + f + '.js')}\n</script>`)).join('\n');
 let html = R('src/shell.html').replace('/*@@CSS@@*/', () => R('src/ui/style.css')).replace('<!--@@SCRIPTS@@-->', () => scripts);
 fs.mkdirSync(path.join(__dirname, 'dist'), { recursive: true });

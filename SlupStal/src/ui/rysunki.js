@@ -74,7 +74,14 @@ D.section = function (sec, o) {
   } else g += tx(X(sec.ymax) + 4, Y(sec.h * 0.25), `t = ${fmt(sec.t, 1)}`, { a: 'start', fs: 10, c: '#3d4656' });
   // +z / −z
   g += tx(X(sec.ymin) - 2, Y(sec.h) + 4, '+z', { a: 'end', fs: 9, c: C.mut }) + tx(X(sec.ymin) - 2, Y(0) - 1, '−z', { a: 'end', fs: 9, c: C.mut });
-  if (o.zones) g += `<rect class="zhit" data-z="all" x="${X(sec.ymin) - 3}" y="${Y(sec.h) - 3}" width="${(sec.ymax - sec.ymin) * sc + 6}" height="${sec.h * sc + 6}" fill="#ffffff" fill-opacity="0"><title>Przekrój – kliknij, aby zmienić</title></rect>`;
+  if (o.zones) {
+    const zone = (z, x0, x1, y0, y1, t) => `<rect class="zhit" data-z="${z}" x="${Math.min(x0, x1)}" y="${Math.min(y0, y1)}" width="${Math.abs(x1 - x0)}" height="${Math.abs(y1 - y0)}" fill="#ffffff" fill-opacity="0" stroke="none"><title>${esc(t)}</title></rect>`;
+    if (sec.kind === 'I') {
+      g += zone('fg', X(-sec.bg / 2) - 3, X(sec.bg / 2) + 3, Y(sec.h) - 3, Y(sec.h - sec.tg) + 2, `Pas (+z) ${fmt(sec.bg, 0)}×${fmt(sec.tg, 1)} – kliknij, aby zmienić (seria, kształtownik lub wymiary)`);
+      g += zone('fd', X(-sec.bd / 2) - 3, X(sec.bd / 2) + 3, Y(sec.td) - 2, Y(0) + 3, `Pas (−z) ${fmt(sec.bd, 0)}×${fmt(sec.td, 1)} – kliknij, aby zmienić`);
+      g += zone('w', X(-sec.tw / 2) - 7, X(sec.tw / 2) + 7, Y(sec.h - sec.tg) + 2, Y(sec.td) - 2, `Środnik t_w = ${fmt(sec.tw, 1)} – kliknij, aby zmienić`);
+    } else g += zone('all', X(sec.ymin) - 3, X(sec.ymax) + 3, Y(sec.h) - 3, Y(0) + 3, 'Przekrój – kliknij, aby zmienić');
+  }
   if (o.sigma) {
     const { My, N, Mz } = o.sigma, fy = o.fy || 355, x0 = X(sec.ymax) + 54, wS = 120;
     const sig = (z) => (N || 0) / sec.A + (My || 0) * (z - sec.zc) / sec.Iy;
@@ -159,7 +166,7 @@ D.heightChart = function (o) {
 };
 D.hAt = function (se, xm) { const x = se.x, v = se.v; for (let i = 1; i < x.length; i++) if (xm <= x[i] + 1e-9) { const a = x[i - 1], b = x[i]; return b - a < 1e-9 ? v[i] : v[i - 1] + (v[i] - v[i - 1]) * (xm - a) / (b - a); } return v[v.length - 1]; };
 // kursor na wykresach wysokościowych (wspólny dla zakładki)
-D.bindHeight = function (root) {
+D.bindHeight = function (root, onPick) {
   const svgs = Array.from(root.querySelectorAll('svg.hchart'));
   const show = (ym) => svgs.forEach(svg => {
     const c = D.HCH[svg.dataset.cid]; if (!c) return;
@@ -174,11 +181,45 @@ D.bindHeight = function (root) {
     const bb = t.getBBox ? t.getBBox() : { x: c.ml, y: y - 15, width: 100, height: 12 };
     const bg = g.querySelector('.curbg'); bg.setAttribute('x', bb.x - 3); bg.setAttribute('y', bb.y - 1); bg.setAttribute('width', bb.width + 6); bg.setAttribute('height', bb.height + 2);
   });
+  const yOf = (svg, ev) => { const c = D.HCH[svg.dataset.cid]; const r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal, py = (ev.clientY - r.top) * vb.height / r.height; const ym = (1 - (py - c.mt) / (c.H - c.mt - c.mb)) * c.Hm; return ym < -1e-9 || ym > c.Hm + 1e-9 ? null : Math.max(0, Math.min(c.Hm, ym)); };
+  const drawPins = (svg) => {
+    const c = D.HCH[svg.dataset.cid]; if (!c) return;
+    let g = svg.querySelector('g.pins'); if (!g) { g = document.createElementNS('http://www.w3.org/2000/svg', 'g'); g.setAttribute('class', 'pins'); svg.insertBefore(g, svg.querySelector('g.cur')); }
+    const X = v => c.ml + (v - c.vmin) / (c.vmax - c.vmin) * (c.W - c.ml - c.mr);
+    let h = '';
+    D.hPins.forEach(ym => {
+      if (ym < 0 || ym > c.Hm) return;
+      const y = c.mt + (1 - ym / c.Hm) * (c.H - c.mt - c.mb);
+      h += `<line x1="${c.ml}" y1="${y.toFixed(1)}" x2="${c.W - c.mr}" y2="${y.toFixed(1)}" stroke="#a35d00" stroke-width="0.8" stroke-dasharray="2 3" pointer-events="none"/>`;
+      const seen = [];
+      c.series.forEach((se, k) => {
+        const v = D.hAt(se, ym); if (!isFinite(v) || seen.some(q => Math.abs(q - v) < 1e-9)) return; seen.push(v);
+        const px = X(v), lab = fmt(v, c.dp), tw = lab.length * 5.6 + 6, bx = Math.max(c.ml, Math.min(c.W - c.mr - tw, px + (v >= 0 ? 4 : -tw - 4))), by = y - 13 - k * 12;
+        h += `<circle cx="${px.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${se.c}" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/><g class="pinlab" data-ym="${ym}" style="cursor:pointer"><title>x = ${fmt(ym, 2)} m: ${lab} – kliknij: siły i sprawdzenia w tym miejscu</title><rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${tw.toFixed(1)}" height="11" rx="2" fill="#ffffff" fill-opacity="0.9" stroke="${se.c}" stroke-width="0.5"/>${tx(bx + tw / 2, by + 8.5, lab, { fs: 9.5, c: se.c, w: 650 })}</g>`;
+      });
+      const xt = `x = ${fmt(ym, 2)}`, xw = xt.length * 5.2 + 6;
+      h += `<rect x="${c.ml + 1}" y="${(y + 2).toFixed(1)}" width="${xw}" height="11" rx="2" fill="#a35d00" fill-opacity="0.9" pointer-events="none"/>` + tx(c.ml + 1 + xw / 2, y + 10.5, xt, { fs: 9, c: '#ffffff', w: 600 });
+    });
+    g.innerHTML = h;
+  };
+  const upd = () => { const b = root.querySelector('#pinClr'); if (b) b.style.display = D.hPins.length ? '' : 'none'; };
   svgs.forEach(svg => {
-    svg.addEventListener('mousemove', ev => { const c = D.HCH[svg.dataset.cid]; if (!c) return; const r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal, py = (ev.clientY - r.top) * vb.height / r.height; const ym = (1 - (py - c.mt) / (c.H - c.mt - c.mb)) * c.Hm; show(ym); });
+    svg.style.cursor = 'crosshair';
+    svg.addEventListener('mousemove', ev => { const c = D.HCH[svg.dataset.cid]; if (!c) return; show(yOf(svg, ev)); });
     svg.addEventListener('mouseleave', () => show(null));
+    svg.addEventListener('click', ev => {
+      const lab = ev.target.closest && ev.target.closest('.pinlab'); if (lab) { if (onPick) onPick(+lab.dataset.ym); return; }
+      const c = D.HCH[svg.dataset.cid]; if (!c) return; const ym = yOf(svg, ev); if (ym === null) return;
+      const tol = 7 * c.Hm / (c.H - c.mt - c.mb), j = D.hPins.findIndex(v => Math.abs(v - ym) <= tol);
+      if (j >= 0) D.hPins.splice(j, 1); else { D.hPins.push(+ym.toFixed(3)); if (D.hPins.length > 8) D.hPins.shift(); }
+      svgs.forEach(drawPins); upd();
+    });
+    svg.addEventListener('contextmenu', ev => { if (!D.hPins.length) return; ev.preventDefault(); D.hPins.length = 0; svgs.forEach(drawPins); upd(); Q.toast('Usunięto znaczniki z wykresów.', 1500); });
   });
+  svgs.forEach(drawPins); upd();
+  const pc = root.querySelector('#pinClr'); if (pc) pc.onclick = () => { D.hPins.length = 0; svgs.forEach(drawPins); upd(); };
 };
+D.hPins = [];
 
 /* ------------------------------------------------------------ schemat słupa w płaszczyźnie */
 // pl: 'y' (M_y, obciążenia w kierunku z) | 'z' (M_z, obciążenia w kierunku y); o: { W, H, diag: 'M'|'V'|'N'|'w'|'buck', loadsOn: Set, sel }
@@ -218,6 +259,7 @@ D.scheme = function (St, R, pl, o) {
   const loads = St.obciazenia || [];
   const on = o.loadsOn;
   let nTop = 0;
+  const sL = s.length;
   loads.forEach((L, li) => {
     if (L.aktywne === false || (on && !on.has(li))) return;
     const col = D.loadColor(L);
@@ -251,6 +293,8 @@ D.scheme = function (St, R, pl, o) {
       }
     });
   });
+  // obciążenia rysowane na wierzchu wykresów (klikalne)
+  const ldS = s.slice(sL); s = s.slice(0, sL);
   // wykres
   const r = R && R.env && !R.errors.length ? R : null;
   const mode = o.diag || 'M';
@@ -263,7 +307,7 @@ D.scheme = function (St, R, pl, o) {
       let g = '';
       arrs.forEach((a, j) => {
         const pts = xs.map((x, i) => `${(cx + a[i] * sc).toFixed(1)},${Y(x).toFixed(1)}`).join(' ');
-        g += `<polygon points="${cx},${Y(xs[0])} ${pts} ${cx},${Y(xs[xs.length - 1])}" fill="${col}" fill-opacity="${j ? 0.06 : 0.12}" stroke="none"/><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" ${j ? 'stroke-dasharray="5 3"' : ''}/>`;
+        g += `<polygon class="dgm" points="${cx},${Y(xs[0])} ${pts} ${cx},${Y(xs[xs.length - 1])}" fill="${col}" fill-opacity="${j ? 0.06 : 0.12}" stroke="none" style="cursor:crosshair"/><polyline class="dgm" points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" ${j ? 'stroke-dasharray="5 3"' : ''}/>`;
       });
       // wartości skrajne
       const marks = [];
@@ -272,9 +316,11 @@ D.scheme = function (St, R, pl, o) {
       void unit;
       return g;
     };
-    if (mode === 'M') { const e = pl === 'y' ? r.env.My : r.env.Mz; s += series([e.max, e.min], pl === 'y' ? C.red : C.vio, 1, 'kNm', 1e6); s += tx(8, H - 38, `M_${pl === 'y' ? 'y' : 'z'},Ed [kNm] – obwiednia SGN${r.method !== 'I' ? ' (II rząd)' : ''}`.replace(/_(\w+),Ed/, '<tspan baseline-shift="sub" font-size="75%">$1,Ed</tspan>'), { fs: 9.5, a: 'start', c: C.ink2 }); }
-    else if (mode === 'V') { const e = pl === 'y' ? r.env.Vz : r.env.Vy; s += series([e.max, e.min], C.blu, 1, 'kN', 1e3); s += tx(8, H - 38, `V [kN] – obwiednia SGN (siła w kierunku ${kier})`, { fs: 9.5, a: 'start', c: C.ink2 }); }
-    else if (mode === 'N') { s += series([r.env.Nmax, r.env.Nmin], C.grn, 0, 'kN', 1e3); s += tx(8, H - 38, 'N_Ed [kN] – obwiednia SGN (+ ściskanie)'.replace('_Ed', '<tspan baseline-shift="sub" font-size="75%">Ed</tspan>'), { fs: 9.5, a: 'start', c: C.ink2 }); }
+    const F = o.F, src = F ? 'kombinacja ' + (o.Flab || '') : 'obwiednia SGN';
+    if (['M', 'V', 'N'].includes(mode)) s += `<rect class="mhit" data-pl="${pl}" x="${cx + cw / 2 + 1}" y="${Y(Hmm)}" width="${Math.max(10, W - cx - cw / 2 - 7)}" height="${hh}" fill="transparent" style="cursor:crosshair"><title>Kliknij – siły i sprawdzenia na tej wysokości</title></rect>`;
+    if (mode === 'M') { const e = pl === 'y' ? r.env.My : r.env.Mz; s += series(F ? [F[pl].M] : [e.max, e.min], pl === 'y' ? C.red : C.vio, 1, 'kNm', 1e6); s += tx(8, H - 38, `M_${pl === 'y' ? 'y' : 'z'},Ed [kNm] – ${src}${r.method !== 'I' ? ' (II rząd)' : ''}`.replace(/_(\w+),Ed/, '<tspan baseline-shift="sub" font-size="75%">$1,Ed</tspan>'), { fs: 9.5, a: 'start', c: C.ink2 }); }
+    else if (mode === 'V') { const e = pl === 'y' ? r.env.Vz : r.env.Vy; s += series(F ? [F[pl].V] : [e.max, e.min], C.blu, 1, 'kN', 1e3); s += tx(8, H - 38, `V [kN] – ${src} (siła w kierunku ${kier})`, { fs: 9.5, a: 'start', c: C.ink2 }); }
+    else if (mode === 'N') { s += series(F ? [F.N] : [r.env.Nmax, r.env.Nmin], C.grn, 0, 'kN', 1e3); s += tx(8, H - 38, `N_Ed [kN] – ${src} (+ ściskanie)`.replace('_Ed', '<tspan baseline-shift="sub" font-size="75%">Ed</tspan>'), { fs: 9.5, a: 'start', c: C.ink2 }); }
     else if (mode === 'w') {
       const q = r.sgu && r.sgu[pl];
       if (q) { let F; try { F = r.method === 'I' ? BS.S.combine1(r.md, r.an, q.combo) : BS.S.combine2(r.md, r.an, r.sec, q.combo, { phi: 0 }); } catch (e) { F = null; } if (F && F[pl]) { s += series([F[pl].w], C.ok, 1, 'mm', 1); s += tx(8, H - 38, `przemieszczenie [mm] – ${q.combo.opis.slice(0, 40)}`, { fs: 9, a: 'start', c: C.ink2 }); } }
@@ -289,6 +335,7 @@ D.scheme = function (St, R, pl, o) {
       } else if (f) s += tx(8, H - 38, f.covered ? 'wyboczenie ujęte imperfekcjami e₀ (II rząd)' : `L_cr = ${fmt(f.Lcr / 1000, 2)} m (przyjęte ręcznie)`, { fs: 9.5, a: 'start', c: C.warn });
     }
   }
+  s += ldS;
   s += Q.dimV(26, Y(Hmm), Y(0), `H = ${fmt(Hm, 2)} m`, { fs: 10 });
   if (o.secName) s += tx(cx + 3, Y(Hmm * 0.5), esc(o.secName), { fs: 8.5, rot: -90, c: C.ink2, w: 600 });
   return s + '</svg>';

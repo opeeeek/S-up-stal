@@ -12,6 +12,7 @@ const path = require('path'), fs = require('fs');
   p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   const ok = (name, c, info) => { n++; if (!c) fails++; console.log(`${c ? 'OK  ' : 'FAIL'} ${name}${info ? ' – ' + info : ''}`); };
   const shot = async (nm) => { if (shots) await p.screenshot({ path: path.join(shots, nm + '.png') }); };
+  await p.addInitScript(() => { window.__printed = 0; window.print = () => { window.__printed++; }; });
   await p.goto('file://' + file); await p.waitForTimeout(1500);
   ok('start – status', /spełnione|Niespełnione/.test(await p.textContent('#status')), await p.textContent('#status'));
   // nowe obciążenie z dialogu
@@ -77,10 +78,78 @@ const path = require('path'), fs = require('fs');
   const tmp2 = path.join(require('os').tmpdir(), 'ss_rep.odt'); await dl2.saveAs(tmp2);
   const odt = fs.readFileSync(tmp2);
   ok('eksport .odt (ZIP)', odt.slice(0, 2).toString() === 'PK' && odt.length > 5000, (odt.length / 1024).toFixed(0) + ' kB');
+  // ---- interakcje jak we wzorcach (BelkaStal / SłupŻB) ----
+  await p.click('.tabs button[data-tab="data"]'); await p.waitForTimeout(400);
+  const mh = await p.$('#dataside .schemesvg .mhit'); const mb = await mh.boundingBox();
+  await p.mouse.click(mb.x + mb.width * 0.3, mb.y + mb.height * 0.7); await p.waitForTimeout(400);
+  ok('klik na wykresie schematu → siły na wysokości x', /na wysokości x/.test(await p.textContent('#modal h3').catch(() => '')));
+  await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+  await p.selectOption('#schCombo', '0'); await p.waitForTimeout(400);
+  ok('kombinacja pod schematem (wykresy wybranej kombinacji)', !!(await p.$('#dataside .combsum')) && /kombinacja/.test(await p.textContent('#dataside .schemesvg')));
+  await p.selectOption('#schCombo', ''); await p.waitForTimeout(300);
+  const nl0 = await p.evaluate(() => BS.A.S().obciazenia.length);
+  const ldp = await p.$('#dataside .schemesvg .ld path, #dataside .schemesvg .ld line'); const lb = await ldp.boundingBox();
+  await p.mouse.click(lb.x + lb.width / 2, lb.y + lb.height / 2, { button: 'right' }); await p.waitForTimeout(250);
+  const menu = await p.$$eval('.ctxmenu button', bs => bs.map(x => x.dataset.ca));
+  ok('menu obciążenia (prawy przycisk)', menu.includes('dup') && menu.includes('onoff') && menu.includes('del'), menu.join(','));
+  await p.click('.ctxmenu [data-ca="dup"]'); await p.waitForTimeout(900);
+  ok('duplikowanie obciążenia z menu', (await p.evaluate(() => BS.A.S().obciazenia.length)) === nl0 + 1);
+  await p.click('#dataside [data-loff="0"]'); await p.waitForTimeout(900);
+  ok('wyłączenie obciążenia w zestawieniu', await p.evaluate(() => BS.A.S().obciazenia[0].aktywne === false));
+  await p.click('#dataside [data-loff="0"]'); await p.waitForTimeout(900);
+  await p.click('#dataside tr[data-openload="1"] td:nth-child(3)'); await p.waitForTimeout(250);
+  ok('klik wiersza zestawienia → edycja obciążenia', /Obciążenie/.test(await p.textContent('#modal h3').catch(() => '')));
+  await p.click('#lCancel'); await p.waitForTimeout(150);
+  await p.click('[data-stool="schemes"]'); await p.waitForTimeout(250);
+  await p.click('#modal [data-sch="uu"]'); await p.waitForTimeout(900);
+  ok('schematy typowe → utwierdzony na obu końcach', await p.evaluate(() => { const q = BS.A.S().podpory; return q.dol.y === 'utw' && q.gora.z === 'utw'; }));
+  await p.click('[data-stool="schemes"]'); await p.waitForTimeout(250);
+  await p.click('#modal [data-sch="hala"]'); await p.waitForTimeout(900);
+  // widok 3D (przełączany 2D/3D)
+  await p.click('[data-stool="v3d"]'); await p.waitForTimeout(900);
+  ok('widok 3D z panelu schematu', !!(await p.$('#p-elev canvas.v3d')));
+  await p.selectOption('#v3M', 'TF'); await p.waitForTimeout(300);
+  const cv = await p.$('#p-elev canvas.v3d'); const cb = await cv.boundingBox();
+  await p.mouse.move(cb.x + 200, cb.y + 200); await p.mouse.down(); await p.mouse.move(cb.x + 260, cb.y + 230, { steps: 4 }); await p.mouse.up();
+  await shot('u3_3d');
+  await p.click('#p-elev [data-v3="2d"]'); await p.waitForTimeout(600);
+  ok('przełączenie na widok 2D', !(await p.$('#p-elev canvas.v3d')) && !!(await p.$('#p-elev svg')));
+  // przekrój: strefy klikalne
+  await p.click('.tabs button[data-tab="sec"]'); await p.waitForTimeout(700);
+  const zh = await p.$('#p-sec .zhit');
+  if (zh) { await zh.click(); await p.waitForTimeout(300); ok('strefa przekroju → okno przekroju z podświetleniem pól', (await p.$$('#modal .hlg')).length > 0); await p.click('#sOk'); await p.waitForTimeout(150); }
+  // wykresy: znaczniki
+  await p.click('.tabs button[data-tab="chart"]'); await p.waitForTimeout(700);
+  const hc = await p.$('#p-chart svg.hchart'); const hb = await hc.boundingBox();
+  await p.mouse.click(hb.x + hb.width / 2, hb.y + hb.height * 0.5); await p.waitForTimeout(250);
+  ok('znacznik na wykresach (klik)', (await p.evaluate(() => BS.D.hPins.length)) === 1 && (await p.$$('#p-chart g.pins circle')).length > 0);
+  await p.click('#pinClr'); await p.waitForTimeout(150);
+  // podsumowanie: pokaż →
+  await p.click('.tabs button[data-tab="sum"]'); await p.waitForTimeout(700);
+  const iBy = await p.evaluate(() => BS.A.R().checks.findIndex(c => c.id === 'By'));
+  await p.click(`[data-gom="${iBy}"]`); await p.waitForTimeout(500);
+  ok('„pokaż →” – przejście do miejsca warunku', (await p.$eval('.tabs button.on', e => e.dataset.tab)) === 'stab' && (await p.$$('#p-stab .hlg')).length > 0);
+  // raport własny i druk w programie
+  await p.click('.tabs button[data-tab="report"]'); await p.waitForTimeout(900);
+  await p.click('#rPrint'); await p.waitForTimeout(250);
+  ok('druk w oknie programu', (await p.evaluate(() => window.__printed)) === 1);
+  await p.click('[data-rm="own"]'); await p.waitForTimeout(700);
+  await p.click('#ownrep h1'); await p.keyboard.press('End'); await p.keyboard.type(' (uzgodnienia)'); await p.waitForTimeout(600);
+  ok('raport własny zapisany w projekcie', await p.evaluate(() => BS.A.S().meta.ownOn === true && /uzgodnienia/.test(BS.A.S().meta.own)));
+  await p.click('[data-rm="full"]'); await p.waitForTimeout(500);
   // drugi słup w projekcie
   await p.click('.tabs button[data-tab="data"]'); await p.waitForTimeout(300);
   await p.click('[data-badd]'); await p.waitForTimeout(900);
   ok('drugi słup w projekcie', (await p.$$('.btab')).length === 2);
+  // nowy projekt: przykład / pusty
+  await p.evaluate(() => BS.A.doAct('new')); await p.waitForTimeout(300);
+  if (await p.isVisible('#nmodal [data-a="1"]').catch(() => false)) { await p.click('#nmodal [data-a="1"]'); await p.waitForTimeout(300); }
+  await p.click('#modal [data-np="pp"]'); await p.waitForTimeout(1500);
+  ok('nowy projekt – przykład słupa przegubowego', await p.evaluate(() => { const R = BS.A.R(); return !R.errors.length && R.sec.nazwa === 'HEB 200' && BS.A.S().obciazenia.length === 2; }));
+  await p.evaluate(() => BS.A.doAct('new')); await p.waitForTimeout(300);
+  if (await p.isVisible('#nmodal [data-a="1"]').catch(() => false)) { await p.click('#nmodal [data-a="1"]'); await p.waitForTimeout(300); }
+  await p.click('#modal [data-np="empty"]'); await p.waitForTimeout(1500);
+  ok('nowy projekt – pusty (tylko ciężar własny)', await p.evaluate(() => !BS.A.R().errors.length && BS.A.S().obciazenia.length === 0));
   ok('brak błędów JS', !errs.length, errs.slice(0, 3).join(' | '));
   console.log(`\n${n - fails}/${n} testów interfejsu zaliczonych`);
   await b.close();
