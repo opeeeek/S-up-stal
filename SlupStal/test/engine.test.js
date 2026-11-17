@@ -108,7 +108,7 @@ cfgs.forEach(([name, f]) => {
   if (err) { ok(name, false, 'wyjątek: ' + err.message + '\n' + err.stack.split('\n').slice(1, 3).join('\n')); return; }
   const badU = R.checks.filter(c => !c.info && c.id !== 'PBG' && (c.util === null || !isFinite(c.util)));
   // niedopasowana geometria podstawy (zmiana przekroju) – dobór podstawy musi ją naprawić
-  if (R.checks.some(c => c.id === 'PBG')) { const b = J.designBase(s, R, 100); if (!b.err) { Object.assign(s.podstawa, { lp: b.lp, bp: b.bp, tp: b.tp }); Object.assign(s.podstawa.kotwy, { d: b.d, kl: b.kl, ez: b.ez, w: b.w }); R = J.run(s); } }
+  if (R.checks.some(c => c.id === 'PBG')) { const b = J.designBase(s, R, 100); if (!b.err) { Object.assign(s.podstawa, { lp: b.lp, bp: b.bp, tp: b.tp, spoiny: { pas: b.af, srodnik: b.aw } }); Object.assign(s.podstawa.kotwy, { d: b.d, kl: b.kl, ez: b.ez, w: b.w, uklad: b.uklad }); R = J.run(s); } }
   const html = (() => { try { return 'ok'; } catch (e) { return e.message; } })();
   ok(name, !R.errors.length && !badU.length && !R.checks.some(c => c.id === 'PBG'), `${R.errors.join('; ')}${badU.map(c => c.n).join(', ')} · η = ${(R.uMax * 100).toFixed(0)}% · ${R.checks.length} spr. · ${Date.now() - t} ms${R.warnings.length ? ' · uwagi: ' + R.warnings.length : ''}`);
   void html;

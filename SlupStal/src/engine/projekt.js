@@ -468,10 +468,16 @@ J.designBase = function (st, R, eta) {
           Object.assign(s2.podstawa.kotwy, { d: dn, kl, ez, w, uklad: fixed ? 'zew' : (s2.podstawa.kotwy.uklad === 'os' ? 'os' : 'wew') });
           let C; try { C = PB.components(s2, sec, R.base, ndp); } catch (e) { continue; }
           if (C.err.length) continue;
-          let u = 0; for (const f of forces) { const r = PB.check(C, f, ndp, sec); u = Math.max(u, r.u); if (u > lim) break; }
+          // nośności bez spoin; spoiny dobierane osobno (wytężenie ∝ 1/a)
+          let u = 0, uf = 0, uw = 0;
+          for (const f of forces) { const r = PB.check(C, f, ndp, sec); u = Math.max(u, r.uN, r.uNt, r.uM, r.uV, r.uTV); uf = Math.max(uf, r.uWf); uw = Math.max(uw, r.uWw); if (u > lim) break; }
           if (u <= lim) {
-            const cost = 7.85e-6 * lp * bp * tp + (fixed ? 4 : C.nb) * BS.M.SRUBY[dn].As * (kl === '8.8' ? 1.6 : 1) * 0.004;
-            if (!best || cost < best.cost) best = { lp, bp, tp, d: dn, kl, ez, w, u, cost };
+            const tmin = Math.min(sec.kind === 'I' ? Math.max(sec.tg, sec.td) : sec.t, tp);
+            const AS = [4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 20];
+            const af = AS.find(a => a >= C.af * uf / lim - 1e-9 && a >= 4) || null, aw = AS.find(a => a >= C.aw * uw / lim - 1e-9 && a >= 4) || null;
+            if (!af || !aw || af > 0.7 * tmin + 1e-9 || aw > 0.7 * Math.min(sec.tw || sec.t, tp) + 1e-9) continue;
+            const cost = 7.85e-6 * lp * bp * tp + (fixed ? 4 : C.nb) * BS.M.SRUBY[dn].As * (kl === '8.8' ? 1.6 : 1) * 0.004 + 0.02 * (af * af * C.lwf * 2 + aw * aw * C.lww) * 7.85e-6;
+            if (!best || cost < best.cost) best = { lp, bp, tp, d: dn, kl, ez, w, u: Math.max(u, uf * C.af / af, uw * C.aw / aw), cost, af, aw, uklad: s2.podstawa.kotwy.uklad };
             break;
           }
         }

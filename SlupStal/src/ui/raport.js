@@ -18,6 +18,7 @@ const f = (v, n) => fm(v, n === undefined ? 2 : n);
 const kN = (v) => fm(v / 1e3, 2), kNm = (v) => fm(v / 1e6, 2), cm2 = (v) => fm(v / 100, 2), cm4 = (v) => fm(v / 1e4, 1), cm3 = (v) => fm(v / 1e3, 1);
 const sym = (s) => esc(s).replace(/_\{([^}]*)\}/g, '<sub>$1</sub>').replace(/\^\{([^}]*)\}/g, '<sup>$1</sup>').replace(/_([0-9A-Za-ząćęłńóśźżθφλαβγχψ]+(?:,[0-9A-Za-ząćęłńóśźżθ.]+)*)/g, '<sub>$1</sub>');
 RP.sym = sym;
+
 // indeksy w wyrażeniach (bez escapowania – wyrażenia są HTML programu)
 const symF = (s) => String(s).replace(/_\{([^}]*)\}/g, '<sub>$1</sub>').replace(/\^\{([^}]*)\}/g, '<sup>$1</sup>').replace(/_([0-9A-Za-ząćęłńóśźżθφλαβγχψ]+(?:,[0-9A-Za-ząćęłńóśźżθ.]+)*)/g, '<sub>$1</sub>');
 RP.symF = symF;
@@ -31,7 +32,7 @@ const eq = (lhs, fx, sb, val, unit, ref, stt) => {
   if (ref) s += `<span class="r">[${ref}]</span>`;
   return s + '</div>';
 };
-const line = (t, ref) => `<div class="eq">${t}${ref ? `<span class="r">[${esc(ref)}]</span>` : ''}</div>`;
+const line = (t, ref) => `<div class="eq">${symF(t)}${ref ? `<span class="r">[${esc(ref)}]</span>` : ''}</div>`;
 const okS = (u) => (u === null || u === undefined ? '' : u <= 1 + 1e-9 ? ' <span class="ok">✔ warunek spełniony</span>' : ' <span class="fail">✖ warunek NIESPEŁNIONY</span>');
 const verd = (Ed, Rd, u, unit) => `<div class="eq"><b>${Ed} ${unit || ''} ${u <= 1 + 1e-9 ? '≤' : '>'} ${Rd} ${unit || ''}</b> → η = <b>${fm(u * 100, 1)}%</b>${okS(u)}</div>`;
 const tbl = (head, rows) => `<table class="rtab"><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>`;

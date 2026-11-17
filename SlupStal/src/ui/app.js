@@ -374,8 +374,8 @@ A.runDesign = async function (kind) {
         const R1 = J.run(S);
         const b = J.designBase(S, R1, eta);
         if (b.err) { msgs.push(b.err); break; }
-        Object.assign(S.podstawa, { lp: b.lp, bp: b.bp, tp: b.tp }); Object.assign(S.podstawa.kotwy, { d: b.d, kl: b.kl, ez: b.ez, w: b.w });
-        msgs.push(`podstawa: ${b.lp}×${b.bp}×${b.tp} mm, kotwy ${b.d} kl. ${b.kl}`);
+        Object.assign(S.podstawa, { lp: b.lp, bp: b.bp, tp: b.tp }); Object.assign(S.podstawa.kotwy, { d: b.d, kl: b.kl, ez: b.ez, w: b.w, uklad: b.uklad }); S.podstawa.spoiny = { pas: b.af, srodnik: b.aw };
+        msgs.push(`podstawa: ${b.lp}×${b.bp}×${b.tp} mm, kotwy ${b.d} kl. ${b.kl}, spoiny ${b.af}/${b.aw} mm`);
       }
       if (kind !== 'all') break;
       const R2 = J.run(S);

@@ -1797,15 +1797,26 @@ const s3 = Math.sqrt(3);
 
 /* ---------------------------------------------------------- klasyfikacja (tabl. 5.2) */
 // położenie osi obojętnej plastycznej przy sile Nc (ściskanie +) i ściskanej stronie Mpos (oś z)
+// tablica pola przekroju powyżej poziomu z (i na prawo od y) – liczona raz dla przekroju, interpolacja liniowa
+function areaTab(sec, ax) {
+  const key = ax === 'y' ? '_tabY' : '_tabZ';
+  if (sec[key]) return sec[key];
+  const n = 240, a0 = ax === 'y' ? sec.ymin : 0, a1 = ax === 'y' ? sec.ymax : sec.h, xs = [], As = [];
+  for (let i = 0; i <= n; i++) { const c = a0 + (a1 - a0) * i / n; xs.push(c); As.push(i === 0 ? sec.A : i === n ? 0 : P.integrals(ax === 'y' ? P.clipY(sec.rings, c) : P.clip(sec.rings, c, true), 0).A); }
+  Object.defineProperty(sec, key, { value: { xs, As }, enumerable: false });
+  return sec[key];
+}
+// położenie, w którym pole „powyżej” = Aab (funkcja malejąca)
+function invTab(t, Aab) {
+  const { xs, As } = t;
+  if (Aab >= As[0]) return xs[0];
+  for (let i = 1; i < xs.length; i++) if (As[i] <= Aab) { const f = (As[i - 1] - Aab) / Math.max(1e-12, As[i - 1] - As[i]); return xs[i - 1] + f * (xs[i] - xs[i - 1]); }
+  return xs[xs.length - 1];
+}
 function plasticNA(sec, fy, Nc, Mpos) {
   const Ac = U.clamp((sec.A + Nc / fy) / 2, 0, sec.A);
-  let lo = 0, hi = sec.h;
-  for (let k = 0; k < 60; k++) {
-    const m = (lo + hi) / 2;
-    const a = P.integrals(P.clip(sec.rings, m, Mpos), 0).A; // pole po stronie ściskanej
-    if (Mpos) { if (a > Ac) lo = m; else hi = m; } else { if (a > Ac) hi = m; else lo = m; }
-  }
-  return (lo + hi) / 2;
+  const t = areaTab(sec, 'z');
+  return invTab(t, Mpos ? Ac : sec.A - Ac);       // Mpos: pole ściskane powyżej osi = Ac
 }
 R.plasticNA = plasticNA;
 // klasa ścianki wewnętrznej przy rozkładzie (α – plastycznie, ψ – sprężyście)
@@ -1823,14 +1834,8 @@ R.plasticNA = plasticNA;
 // oś obojętna plastyczna w kierunku y (zginanie M_z): pole po stronie ściskanej (+y gdy Mpos) = (A + Nc/fy)/2
 function plasticNAy(sec, fy, Nc, Mpos) {
   const Ac = U.clamp((sec.A + Nc / fy) / 2, 0, sec.A);
-  let lo = sec.ymin, hi = sec.ymax;
-  for (let k = 0; k < 60; k++) {
-    const m = (lo + hi) / 2;
-    const ar = P.integrals(P.clipY(sec.rings, m), 0).A;     // pole po stronie y ≥ m
-    const a = Mpos ? ar : sec.A - ar;
-    if (Mpos) { if (a > Ac) lo = m; else hi = m; } else { if (a > Ac) hi = m; else lo = m; }
-  }
-  return (lo + hi) / 2;
+  const t = areaTab(sec, 'y');
+  return invTab(t, Mpos ? Ac : sec.A - Ac);       // Mpos: pole ściskane po stronie +y = Ac
 }
 R.plasticNAy = plasticNAy;
 // klasa ścianki wewnętrznej (α – rozkład plastyczny, ψ – sprężysty)
@@ -2072,7 +2077,10 @@ R.basic = function (sec, mat, ndp) {
 /* ---------------------------------------------------------- kontekst kombinacji: klasa przy (N, M_y, M_z) */
 R.ctx = function (sec, b, N, My, Mz) {
   const fy = b.fy;
-  const k = R.classCol(sec, fy, N, My, Mz);
+  const ck = Math.round(N / b.Npl * 2e4) + '|' + Math.round(My / b.Mply * 2e4) + '|' + Math.round(Mz / b.Mplz * 2e4);
+  if (!sec._cls) Object.defineProperty(sec, '_cls', { value: new Map(), enumerable: false });
+  let k = sec._cls.get(ck);
+  if (!k) { k = R.classCol(sec, fy, N, My, Mz); if (sec._cls.size < 20000) sec._cls.set(ck, k); }
   const cls = k.cls;
   let Wy, Wz, Aeff = sec.A, eNy = 0, effNote = null;
   if (cls <= 2) { Wy = sec.Wpl_y; Wz = sec.Wpl_z; }
@@ -3083,7 +3091,7 @@ T.ftBase = (md, sec) => ({ xs: md.xs, EIy: U.E * sec.Iy, EIz: U.E * sec.Iz, EIw:
 T.ncrAll = function (md, sec, Nel, ns, cache) {
   let Nmax = 0; for (let e = 0; e < md.ne; e++) Nmax = Math.max(Nmax, Nel[e]);
   if (!(Nmax > 1e-6)) return { Nmax: 0, y: { alpha: Infinity }, z: { alpha: Infinity }, T: { alpha: Infinity }, TF: { alpha: Infinity } };
-  const key = (ns ? 'ns|' : 's|') + Array.from(Nel).map(v => Math.round(Math.max(0, v) / Nmax * 500)).join(',');
+  const key = (ns ? 'ns|' : 's|') + Array.from(Nel).map(v => Math.round(Math.max(0, v) / Nmax * 200)).join(',');
   if (cache && cache[key]) return Object.assign({ Nmax }, cache[key]);
   const Nn = Float64Array.from(Nel, v => Math.max(0, v) / Nmax);   // rozkład jednostkowy (N_max = 1)
   const o = {};
@@ -3397,13 +3405,14 @@ T.general = function (c) {
   let aUlt = Infinity, at = null;
   const pts = []; let iN = 0, iM = 0;
   for (let i = 0; i < xs3.length; i++) { if (Fk.N[i] > Fk.N[iN]) iN = i; if (Math.abs(Fk.y.M[i]) > Math.abs(Fk.y.M[iM])) iM = i; }
-  pts.push(iN, iM); for (let i = 0; i < xs3.length; i += 6) pts.push(i);
+  pts.push(iN, iM, 0, xs3.length - 1); for (let i = 0; i < xs3.length; i += 12) pts.push(i);
   Array.from(new Set(pts)).forEach(i => {
     const N = Fk.N[i], My = Fk.y.M[i];
-    const u1 = (lam) => { const cx = R.ctx(sec, bK, lam * N, lam * My, 0); const r = R.atPoint(sec, bK, ndpK, { N: lam * N, My: lam * My }, cx); return Math.max(r.uMN, r.uN); };
+    const cx = R.ctx(sec, bK, N, My, 0);
+    const u1 = (lam) => { const r = R.atPoint(sec, bK, ndpK, { N: lam * N, My: lam * My }, cx); return Math.max(r.uMN, r.uN); };
     if (u1(1) <= 0) return;
     let lo = 0, hi = 1; while (u1(hi) < 1 && hi < 1e4) hi *= 2;
-    for (let k = 0; k < 50; k++) { const m = (lo + hi) / 2; if (u1(m) < 1) lo = m; else hi = m; }
+    for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (u1(m) < 1) lo = m; else hi = m; }
     const a = (lo + hi) / 2; if (a < aUlt) { aUlt = a; at = xs3[i]; }
   });
   // α_cr,op: postać z płaszczyzny (u, φ) przy N(x) i M_y(x) kombinacji
@@ -4160,7 +4169,8 @@ J.run = function (st0, opt) {
     else if (maxMz > 0.02 * base.Mcz) out.info.push('Metoda ogólna 6.3.4 – nie dotyczy: występuje zginanie M_z (metoda dotyczy elementów obciążonych w płaszczyźnie).');
     else {
       let g = null;
-      sgn.forEach(c => {
+      const rank = res.map(cr => ({ c: cr.combo, u: Math.max(0, ...cr.variants.map(v => v.mem ? Math.max(0, ...v.mem.segs.map(s => s.u)) : 0)) })).sort((a, b) => b.u - a.u).slice(0, 3).map(q => q.c);
+      rank.forEach(c => {
         const c1 = S.combine1(md, an, c);
         const o = { phi: imp.phi, e0L: { y: e0L.y, z: 0 }, var: md.sway.y ? { pl: 'y', s: Math.sign(S.maxAbs(c1.y.w).v) || 1 } : { pl: 'y', s: Math.sign(S.maxAbs(c1.y.w).v) || 1 }, sgnB: { y: Math.sign(S.maxAbs(c1.y.w).v) || 1, z: 1 } };
         if (!md.sway.y) o.phi = 0;
@@ -4193,8 +4203,9 @@ J.run = function (st0, opt) {
     let C = null;
     try { C = PB.components(st, sec, base, ndp); } catch (e) { err('Podstawa: ' + e.message); }
     if (C) {
-      C.err.forEach(err); C.warn.forEach(wrn);
+      C.warn.forEach(wrn);
       out.pb = { C, worst: {} };
+      if (C.err.length) out.checks.push(BS.check({ id: 'PBG', grp: 'Podstawa słupa (PN-EN 1993-1-8)', n: 'Geometria podstawy: ' + C.err.map(e => e.replace(/^Podstawa: /, '')).join(' '), ref: 'PN-EN 1993-1-8, 6.2.5, tabl. 3.3', Ed: 1, Rd: 0, unit: '-', util: Infinity, forceStatus: 'fail', d: { C } }));
       if (!C.err.length) {
         const fixedModel = md.bc.dol.y === 'utw' || md.bc.dol.z === 'utw' || !!out.baseSpring;
         if (C.fixed && !fixedModel) wrn('Podstawa zaprojektowana jako utwierdzona, a w modelu podstawa jest przegubowa – sprawdź zgodność modelu.');
@@ -4348,10 +4359,16 @@ J.designBase = function (st, R, eta) {
           Object.assign(s2.podstawa.kotwy, { d: dn, kl, ez, w, uklad: fixed ? 'zew' : (s2.podstawa.kotwy.uklad === 'os' ? 'os' : 'wew') });
           let C; try { C = PB.components(s2, sec, R.base, ndp); } catch (e) { continue; }
           if (C.err.length) continue;
-          let u = 0; for (const f of forces) { const r = PB.check(C, f, ndp, sec); u = Math.max(u, r.u); if (u > lim) break; }
+          // nośności bez spoin; spoiny dobierane osobno (wytężenie ∝ 1/a)
+          let u = 0, uf = 0, uw = 0;
+          for (const f of forces) { const r = PB.check(C, f, ndp, sec); u = Math.max(u, r.uN, r.uNt, r.uM, r.uV, r.uTV); uf = Math.max(uf, r.uWf); uw = Math.max(uw, r.uWw); if (u > lim) break; }
           if (u <= lim) {
-            const cost = 7.85e-6 * lp * bp * tp + (fixed ? 4 : C.nb) * BS.M.SRUBY[dn].As * (kl === '8.8' ? 1.6 : 1) * 0.004;
-            if (!best || cost < best.cost) best = { lp, bp, tp, d: dn, kl, ez, w, u, cost };
+            const tmin = Math.min(sec.kind === 'I' ? Math.max(sec.tg, sec.td) : sec.t, tp);
+            const AS = [4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 20];
+            const af = AS.find(a => a >= C.af * uf / lim - 1e-9 && a >= 4) || null, aw = AS.find(a => a >= C.aw * uw / lim - 1e-9 && a >= 4) || null;
+            if (!af || !aw || af > 0.7 * tmin + 1e-9 || aw > 0.7 * Math.min(sec.tw || sec.t, tp) + 1e-9) continue;
+            const cost = 7.85e-6 * lp * bp * tp + (fixed ? 4 : C.nb) * BS.M.SRUBY[dn].As * (kl === '8.8' ? 1.6 : 1) * 0.004 + 0.02 * (af * af * C.lwf * 2 + aw * aw * C.lww) * 7.85e-6;
+            if (!best || cost < best.cost) best = { lp, bp, tp, d: dn, kl, ez, w, u: Math.max(u, uf * C.af / af, uw * C.aw / aw), cost, af, aw, uklad: s2.podstawa.kotwy.uklad };
             break;
           }
         }
@@ -5037,6 +5054,7 @@ const f = (v, n) => fm(v, n === undefined ? 2 : n);
 const kN = (v) => fm(v / 1e3, 2), kNm = (v) => fm(v / 1e6, 2), cm2 = (v) => fm(v / 100, 2), cm4 = (v) => fm(v / 1e4, 1), cm3 = (v) => fm(v / 1e3, 1);
 const sym = (s) => esc(s).replace(/_\{([^}]*)\}/g, '<sub>$1</sub>').replace(/\^\{([^}]*)\}/g, '<sup>$1</sup>').replace(/_([0-9A-Za-ząćęłńóśźżθφλαβγχψ]+(?:,[0-9A-Za-ząćęłńóśźżθ.]+)*)/g, '<sub>$1</sub>');
 RP.sym = sym;
+
 // indeksy w wyrażeniach (bez escapowania – wyrażenia są HTML programu)
 const symF = (s) => String(s).replace(/_\{([^}]*)\}/g, '<sub>$1</sub>').replace(/\^\{([^}]*)\}/g, '<sup>$1</sup>').replace(/_([0-9A-Za-ząćęłńóśźżθφλαβγχψ]+(?:,[0-9A-Za-ząćęłńóśźżθ.]+)*)/g, '<sub>$1</sub>');
 RP.symF = symF;
@@ -5050,7 +5068,7 @@ const eq = (lhs, fx, sb, val, unit, ref, stt) => {
   if (ref) s += `<span class="r">[${ref}]</span>`;
   return s + '</div>';
 };
-const line = (t, ref) => `<div class="eq">${t}${ref ? `<span class="r">[${esc(ref)}]</span>` : ''}</div>`;
+const line = (t, ref) => `<div class="eq">${symF(t)}${ref ? `<span class="r">[${esc(ref)}]</span>` : ''}</div>`;
 const okS = (u) => (u === null || u === undefined ? '' : u <= 1 + 1e-9 ? ' <span class="ok">✔ warunek spełniony</span>' : ' <span class="fail">✖ warunek NIESPEŁNIONY</span>');
 const verd = (Ed, Rd, u, unit) => `<div class="eq"><b>${Ed} ${unit || ''} ${u <= 1 + 1e-9 ? '≤' : '>'} ${Rd} ${unit || ''}</b> → η = <b>${fm(u * 100, 1)}%</b>${okS(u)}</div>`;
 const tbl = (head, rows) => `<table class="rtab"><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>`;
@@ -6011,8 +6029,8 @@ A.runDesign = async function (kind) {
         const R1 = J.run(S);
         const b = J.designBase(S, R1, eta);
         if (b.err) { msgs.push(b.err); break; }
-        Object.assign(S.podstawa, { lp: b.lp, bp: b.bp, tp: b.tp }); Object.assign(S.podstawa.kotwy, { d: b.d, kl: b.kl, ez: b.ez, w: b.w });
-        msgs.push(`podstawa: ${b.lp}×${b.bp}×${b.tp} mm, kotwy ${b.d} kl. ${b.kl}`);
+        Object.assign(S.podstawa, { lp: b.lp, bp: b.bp, tp: b.tp }); Object.assign(S.podstawa.kotwy, { d: b.d, kl: b.kl, ez: b.ez, w: b.w, uklad: b.uklad }); S.podstawa.spoiny = { pas: b.af, srodnik: b.aw };
+        msgs.push(`podstawa: ${b.lp}×${b.bp}×${b.tp} mm, kotwy ${b.d} kl. ${b.kl}, spoiny ${b.af}/${b.aw} mm`);
       }
       if (kind !== 'all') break;
       const R2 = J.run(S);
