@@ -340,6 +340,8 @@ F.ft = function (m) {
     if (s.zr !== undefined && s.k !== 0) { const k = s.k === 'rigid' || s.k === undefined ? kref : s.k; bandAdd(KE, a, a, k); bandAdd(KE, a, b, -k * s.zr); bandAdd(KE, b, b, k * s.zr * s.zr); }
     if (s.kv) { const k = s.kv === 'rigid' ? kref : s.kv; bandAdd(KE, v, v, k); }
     if (s.kt) { const k = s.kt === 'rigid' ? kref * Lt * Lt : s.kt; bandAdd(KE, b, b, k); }
+    if (s.kru) bandAdd(KE, a + 1, a + 1, s.kru);      // sprężyna obrotowa (u′)
+    if (s.krv) bandAdd(KE, v + 1, v + 1, s.krv);      // sprężyna obrotowa (v′)
   });
   const fixed = new Set();
   // pola nieaktywne – zablokowane w całości

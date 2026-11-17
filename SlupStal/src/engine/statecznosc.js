@@ -128,10 +128,11 @@ T.segLT = function (md) {
 T.restrZ = (sec, wys) => (wys === 'pas+' ? sec.h - (sec.tg || sec.t || 0) / 2 - sec.zs : wys === 'pas-' ? (sec.td || sec.t || 0) / 2 - sec.zs : 0);
 T.heightOf = (sec, wys) => (wys === 'pas+' ? sec.h - sec.zs : wys === 'pas-' ? -sec.zs : 0);
 T.bc3 = function (md, sec, ns) {
-  const b = md.bc, H = md.H, bc = [], springs = [];
+  const b = md.bc, H = md.H, bc = [], springs = [];  // więzy sztywne i sprężyny
   // podstawa: u, v = 0; obroty wg utwierdzenia; φ = 0; deplanacja wg warunku
   bc.push({ x: 0, u: true, v: true, du: b.dol.z === 'utw', dv: b.dol.y === 'utw', phi: true, dphi: b.dol.skret === 'pelne' });
-  if (b.dol.z === 'spr' && b.dol.krz > 0) { /* sprężyna obrotowa – pominięta w analizie przestrzennej (bezpiecznie: przegub) */ }
+  if (b.dol.z === 'spr' && b.dol.krz > 0) springs.push({ x: 0, kru: b.dol.krz });
+  if (b.dol.y === 'spr' && b.dol.kry > 0) springs.push({ x: 0, krv: b.dol.kry });
   const top = { x: H };
   const tr = (g) => g === 'prz' || g === 'utw' || (ns && (g === 'swob' || g === 'utwp' || g === 'spr'));
   if (tr(b.gora.z)) top.u = true; if (tr(b.gora.y)) top.v = true;
@@ -169,8 +170,9 @@ T.ncrAll = function (md, sec, Nel, ns, cache) {
     const b = T.ftBase(md, sec);
     const rT = F.ft(Object.assign({}, b, { fields: { u: false, v: false, phi: true }, Nel: Nn, bc, springs, z0: 0 }));
     o.T = { alpha: rT.lam, mode: rT.mode, err: rT.err };
-    if (Math.abs(sec.z0 || 0) > 1e-6) { const rTF = F.ft(Object.assign({}, b, { fields: { u: true, v: false, phi: true }, Nel: Nn, bc, springs })); o.TF = { alpha: rTF.lam, mode: rTF.mode, err: rTF.err }; }
-    else o.TF = { alpha: Math.min(o.z.alpha, o.T.alpha), same: true };
+    // postać sprzężona (u, φ): monosymetria lub stężenia przy pasie (wyboczenie względem osi wymuszonej)
+    const rTF = F.ft(Object.assign({}, b, { fields: { u: true, v: false, phi: true }, Nel: Nn, bc, springs }));
+    o.TF = { alpha: rTF.lam, mode: rTF.mode, err: rTF.err };
     // N_cr,T obliczone ze środka ścinania z i0² (z0 ≠ 0 uwzględnione w TF)
   } else { o.T = { alpha: Infinity, closed: true }; o.TF = { alpha: Infinity, closed: true }; }
   if (cache) cache[key] = o;
@@ -285,7 +287,7 @@ T.member = function (c) {
       const LT = U.num(ov.LcrT) * 1000; tors.LcrT = LT; tors.manual = true;
       tors.NcrT = (G * sec.It + Math.PI * Math.PI * E * sec.Iw / (LT * LT)) / i02;
       if (Math.abs(sec.z0) > 1e-6) { const Nz = flex.z.Ncr, bt = 1 - sec.z0 * sec.z0 / i02, a = Nz + tors.NcrT; tors.NcrTF = (a - Math.sqrt(a * a - 4 * bt * Nz * tors.NcrT)) / (2 * bt); }
-      else tors.NcrTF = Math.min(flex.z.Ncr, tors.NcrT);
+      else tors.NcrTF = Infinity;
       tors.src = 'L_cr,T przyjęte ręcznie';
     } else {
       tors.NcrT = Nmax > 0 ? nc.T.alpha : Infinity; tors.NcrTF = Nmax > 0 ? nc.TF.alpha : Infinity;
@@ -294,7 +296,10 @@ T.member = function (c) {
       tors.mode = nc.T && nc.T.mode;
     }
     tors.mono = Math.abs(sec.z0 || 0) > 1e-6;
-    tors.Ncr = tors.mono ? Math.min(tors.NcrT, tors.NcrTF) : tors.NcrT;   // przekrój bisymetryczny: postać skrętna niezależna od giętnych
+    // N_cr,TF z analizy sprzężonej (u, φ) jest miarodajne, gdy jest mniejsze od N_cr,z (postać giętno-skrętna lub względem osi wymuszonej stężeniem przy pasie);
+    // w przeciwnym razie postać sprzężona jest postacią giętną z–z, sprawdzaną osobno
+    tors.tfGov = isFinite(tors.NcrTF) && tors.NcrTF < flex.z.Ncr * 0.995;
+    tors.Ncr = tors.tfGov ? Math.min(tors.NcrT, tors.NcrTF) : tors.NcrT;
     tors.lam = isFinite(tors.Ncr) && tors.Ncr > 0 ? Math.sqrt(NRk / tors.Ncr) : 0;
     tors.curve = flex.z.curve;
     tors.chi = T.chi(tors.lam, ALPHA[tors.curve]);

@@ -91,8 +91,11 @@ S.model = function (st, sec) {
   // podpory w płaszczyznach (statyka)
   md.sup = { y: S.supports(md, 'y', false), z: S.supports(md, 'z', false) };
   md.supNS = { y: S.supports(md, 'y', true), z: S.supports(md, 'z', true) };
-  ['y', 'z'].forEach(pl => { const b = md.bc; if (b.dol[pl] !== 'utw' && b.gora[pl] === 'swob') md.err.push(`Płaszczyzna ${S.PLS[pl]}: układ geometrycznie zmienny – przy swobodnym końcu górnym podstawa musi być utwierdzona.`); });
-  ['y', 'z'].forEach(pl => { const b = md.bc; if (b.dol[pl] === 'prz' && b.gora[pl] === 'utwp') md.err.push(`Płaszczyzna ${S.PLS[pl]}: przegub u podstawy z utwierdzeniem przesuwnym u góry – układ geometrycznie zmienny.`); });
+  const kr0 = (pl) => (pl === 'y' ? md.bc.dol.kry : md.bc.dol.krz);
+  const baseRot = (pl) => md.bc.dol[pl] === 'utw' || (md.bc.dol[pl] === 'spr' && kr0(pl) > 0);
+  const hasBrace = (pl) => md.stez.some(z => z.pl === pl || z.pl === 'yz');
+  ['y', 'z'].forEach(pl => { const b = md.bc; if (!baseRot(pl) && (b.gora[pl] === 'swob' || b.gora[pl] === 'utwp' || (b.gora[pl] === 'spr' && !((pl === 'y' ? b.gora.khz : b.gora.khy) > 0))) && !hasBrace(pl)) md.err.push(`Płaszczyzna ${S.PLS[pl]}: układ geometrycznie zmienny – przy przesuwnym końcu górnym podstawa musi być utwierdzona (lub sprężysta z k > 0).`); });
+  ['y', 'z'].forEach(pl => { const b = md.bc; if (b.dol[pl] === 'spr' && !(kr0(pl) > 0)) md.warn.push(`Płaszczyzna ${S.PLS[pl]}: sprężyna obrotowa podstawy k = 0 – przyjęto przegub.`); });
   md.sway = { y: S.isSway(md, 'y'), z: S.isSway(md, 'z') };
   return md;
 };

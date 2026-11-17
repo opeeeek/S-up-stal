@@ -31,7 +31,7 @@ J.defaultState = function () {
     geom: { H: 6.0 },
     podpory: { dol: { y: 'utw', z: 'prz', kry: '', krz: '', skret: 'widelki' }, gora: { y: 'swob', z: 'prz', khy: '', khz: '', skret: 'widelki' } },
     stezenia: [{ x: 3.0, pl: 'z', wys: 'pas+', skret: false }],
-    przekroj: { typ: 'walc', seria: 'HEB', nr: 240 },
+    przekroj: { typ: 'walc', seria: 'HEA', nr: 280 },
     material: { gatunek: 'S355', podgatunek: 'J2', fyRecz: '' },
     ciezarWlasny: { auto: true, dodatek: 10 },
     obciazenia: [
@@ -44,7 +44,7 @@ J.defaultState = function () {
     analiza: { metoda: 'II_glob', imp: { m: 1, phi: '', e0y: '', e0z: '', pomin015: true }, interMet: 'ndp', ogolna: false,
       nadp: { LcrY: '', LcrZ: '', LcrT: '', muY: '', muZ: '', krzY: 'auto', krzZ: 'auto', krzLT: 'auto', Mcr: '', Cmy: '', Cmz: '', CmLT: '', kc: '' } },
     sgu: { typ: 'hala', lim: 150, limZ: 150 },
-    podstawa: { aktywna: true, typ: 'sztywna', lp: 460, bp: 360, tp: 30, gat: 'S235', kotwy: { d: 'M24', kl: '5.6', uklad: 'zew', ez: 50, w: 260, n: 4, p: '' }, beton: 'C25/30', podlewka: 30, aF: 1200, bF: 1400, hF: 800, kjRecz: '', spoiny: { pas: 8, srodnik: 5 }, scinanieKotwy: true },
+    podstawa: { aktywna: true, typ: 'sztywna', lp: 480, bp: 360, tp: 35, gat: 'S235', kotwy: { d: 'M30', kl: '8.8', uklad: 'zew', ez: 55, w: 260, n: 4, p: '' }, beton: 'C25/30', podlewka: 30, aF: 1200, bF: 1400, hF: 800, kjRecz: '', spoiny: { pas: 10, srodnik: 5 }, scinanieKotwy: true, podatna: true },
     pozar: { aktywny: false, R: 30, ekspozycja: '4', ochrona: 'brak', dp: 20, lp: 0.12, cp: 1200, rp: 300, LcrFi: 1.0 },
     kruche: { Tmd: -25, dTr: 0 },
     wykonanie: { CC: 'CC2', EXC: 'auto', uzasadnienie: '', korozja: 'C3', trwalosc: 'M', uwagi: '' },
@@ -113,6 +113,19 @@ J.run = function (st0, opt) {
   try { base = R.basic(sec, mat, ndp); } catch (e) { err('Przekrój: ' + e.message); return out; }
   out.base = base;
   if (base.effErr) err('Przekrój: ' + base.effErr);
+  // --- podatność podstawy w modelu (S_j,ini z metody składnikowej, czyste zginanie – dolne oszacowanie)
+  out.baseSpring = null;
+  if (st.podstawa && st.podstawa.aktywna && st.podstawa.typ === 'sztywna' && st.podstawa.podatna && sec.kind !== 'CHS') {
+    try {
+      const C0 = PB.components(st, sec, base, ndp);
+      if (!C0.err.length && C0.stiff) {
+        const s0 = C0.stiff, Sj0 = U.E * s0.z * s0.z / (1 / s0.kT + 1 / s0.kC);
+        ['y', 'z'].forEach(pl => {
+          if (pl === 'y' && st.podpory.dol.y === 'utw') { st.podpory.dol.y = 'spr'; st.podpory.dol.kry = Sj0 / 1e6; out.baseSpring = { pl, Sj: Sj0 }; }
+        });
+      }
+    } catch (e) { /* bez podatności */ }
+  }
   // --- model i analiza I rzędu
   const md = S.model(st, sec); out.md = md;
   md.err.forEach(err); md.warn.forEach(wrn);
@@ -214,7 +227,7 @@ J.run = function (st0, opt) {
           rec('By', { util: NEd / fy1.NbRd, combo: c, vr: vr.lab, mem, NEd, f: fy1 });
           rec('Bz', { util: NEd / fz1.NbRd, combo: c, vr: vr.lab, mem, NEd, f: fz1 });
         }
-        if (NEd > 0 && mem.tors.relevant && isFinite(mem.tors.Ncr)) rec('BT', { util: NEd / mem.tors.NbRd, combo: c, vr: vr.lab, mem, NEd, f: mem.tors });
+        if (NEd > 0 && mem.tors.relevant && isFinite(mem.tors.Ncr) && method !== 'II_pelna' || NEd > 0 && mem.tors.relevant && method === 'II_pelna' && mem.tors.chi < 1) rec('BT', { util: NEd / mem.tors.NbRd, combo: c, vr: vr.lab, mem, NEd, f: mem.tors });
         mem.segs.forEach((s, si) => {
           if (mem.ltbSus && s.MyEd > 1e3 && !s.ltb.none) rec('LT' + si, { util: (s.MyEd + s.dMy) / s.MbRd, combo: c, vr: vr.lab, mem, s });
           rec('I61_' + si, { util: s.u61, combo: c, vr: vr.lab, mem, s });
@@ -228,7 +241,7 @@ J.run = function (st0, opt) {
     });
     res.push(cr);
   });
-  out.env = env; out.alphaMin = alphaMin;
+  out.env = env; out.alphaMin = alphaMin; out.baseForces = baseForces;
   // ---------------------------------------------------------------- rejestr sprawdzeń – SGN
   const G1 = 'Nośność przekroju (PN-EN 1993-1-1, 6.2)', G2 = 'Stateczność elementu (PN-EN 1993-1-1, 6.3)', G0 = 'Analiza globalna (PN-EN 1993-1-1, 5.2–5.3)';
   // analiza globalna – α_cr
@@ -254,7 +267,7 @@ J.run = function (st0, opt) {
   // stateczność
   if (reg.By) out.checks.push(BS.check({ id: 'By', grp: G2, n: 'Wyboczenie giętne względem osi y–y', ref: '6.3.1', Ed: reg.By.NEd, Rd: reg.By.f.NbRd, unit: 'F', util: reg.By.util, combo: fmtCombo(reg.By.combo), d: reg.By }));
   if (reg.Bz) out.checks.push(BS.check({ id: 'Bz', grp: G2, n: 'Wyboczenie giętne względem osi z–z', ref: '6.3.1', Ed: reg.Bz.NEd, Rd: reg.Bz.f.NbRd, unit: 'F', util: reg.Bz.util, combo: fmtCombo(reg.Bz.combo), d: reg.Bz }));
-  if (reg.BT) out.checks.push(BS.check({ id: 'BT', grp: G2, n: Math.abs(sec.z0 || 0) > 1e-6 ? 'Wyboczenie skrętne / giętno-skrętne' : 'Wyboczenie skrętne', ref: '6.3.1.4', Ed: reg.BT.NEd, Rd: reg.BT.f.NbRd, unit: 'F', util: reg.BT.util, combo: fmtCombo(reg.BT.combo), d: reg.BT }));
+  if (reg.BT) out.checks.push(BS.check({ id: 'BT', grp: G2, n: reg.BT.f.tfGov ? 'Wyboczenie giętno-skrętne (sprzężone u–φ)' : 'Wyboczenie skrętne', ref: '6.3.1.4', Ed: reg.BT.NEd, Rd: reg.BT.f.NbRd, unit: 'F', util: reg.BT.util, combo: fmtCombo(reg.BT.combo), d: reg.BT }));
   const segN = (s) => md.stez.length || T.segLT(md).length > 1 ? ` – odcinek ${U.fmt(s.sg.x0 / 1000, 2)}–${U.fmt(s.sg.x1 / 1000, 2)} m` : '';
   Object.keys(reg).filter(k => /^LT\d+$/.test(k)).forEach(k => { const q = reg[k]; out.checks.push(BS.check({ id: k, grp: G2, n: 'Zwichrzenie' + segN(q.s), ref: '6.3.2.1, ' + (q.s.met === '6.3.2.3' ? '6.3.2.3' : '6.3.2.2'), Ed: q.s.MyEd + q.s.dMy, Rd: q.s.MbRd, unit: 'M', util: q.util, x: q.s.xMy, combo: fmtCombo(q.combo) + (method !== 'I' ? ` · ${q.vr}` : ''), d: q })); });
   Object.keys(reg).filter(k => /^I6[12]_\d+$/.test(k)).sort().forEach(k => { const q = reg[k], is61 = /^I61/.test(k); out.checks.push(BS.check({ id: k, grp: G2, n: `Interakcja N + M_y + M_z (${is61 ? '6.61' : '6.62'}, zał. ${q.s.meth})` + segN(q.s), ref: '6.3.3 (' + (is61 ? '6.61' : '6.62') + '), zał. ' + q.s.meth, Ed: q.util, Rd: 1, unit: '-', util: q.util, combo: fmtCombo(q.combo) + (method !== 'I' ? ` · ${q.vr}` : ''), d: q })); });
@@ -301,7 +314,7 @@ J.run = function (st0, opt) {
       C.err.forEach(err); C.warn.forEach(wrn);
       out.pb = { C, worst: {} };
       if (!C.err.length) {
-        const fixedModel = md.bc.dol.y === 'utw' || md.bc.dol.z === 'utw';
+        const fixedModel = md.bc.dol.y === 'utw' || md.bc.dol.z === 'utw' || !!out.baseSpring;
         if (C.fixed && !fixedModel) wrn('Podstawa zaprojektowana jako utwierdzona, a w modelu podstawa jest przegubowa – sprawdź zgodność modelu.');
         if (!C.fixed && fixedModel) err('Model zakłada utwierdzenie podstawy, a podstawa jest zaprojektowana jako przegubowa – zmień typ podstawy na utwierdzoną lub warunek podparcia na przegub.');
         const W = {};
@@ -327,7 +340,8 @@ J.run = function (st0, opt) {
           out.pb.stiff = s1;
           if (s1) {
             const ok = md.bc.dol.y !== 'utw' || s1.rigid;
-            out.checks.push(BS.check({ id: 'PBS', grp: GB, n: `Sztywność podstawy S_j,ini = ${U.fmt(s1.Sj / 1e9, 1)} MNm/rad – ${s1.cls}`, ref: '6.3.4, 5.2.2.5(4)', Ed: s1.Sj, Rd: 30 * s1.EIL, unit: '-', util: s1.rigid ? 0 : 30 * s1.EIL / s1.Sj, info: true, forceStatus: ok ? 'ok' : 'warn', d: s1 }));
+            s1.inModel = out.baseSpring;
+            out.checks.push(BS.check({ id: 'PBS', grp: GB, n: `Sztywność podstawy S_j,ini = ${U.fmt(s1.Sj / 1e9, 1)} MNm/rad – ${s1.cls}${out.baseSpring ? ' (podatność uwzględniona w modelu)' : ''}`, ref: '6.3.4, 5.2.2.5(4)', Ed: s1.Sj, Rd: 30 * s1.EIL, unit: '-', util: s1.rigid ? 0 : 30 * s1.EIL / s1.Sj, info: true, forceStatus: ok ? 'ok' : 'warn', d: s1 }));
             if (!ok) wrn(`Podstawa podatna: S_j,ini = ${U.fmt(s1.Sj / 1e9, 2)} MNm/rad < 30·EI_c/L_c = ${U.fmt(30 * s1.EIL / 1e9, 2)} MNm/rad – w modelu przyjęto utwierdzenie. Rozważ: sprężynę obrotową w modelu (k = ${U.fmt(s1.Sj / 1e9, 2)} MNm/rad) lub sztywniejszą podstawę (grubsza blacha, żebra, większe kotwy).`);
           }
         }
@@ -385,6 +399,85 @@ J.run = function (st0, opt) {
   if (out.checks.some(c => !c.info && (c.util === Infinity || (c.util !== null && !isFinite(c.util))))) out.uMax = Infinity;
   out.time = Date.now() - t0;
   return out;
+};
+
+
+/* ================================================================ DOBÓR */
+J.passes = function (R, eta, scope) {
+  if (!R) return false;
+  if (R.errors.some(e => !(scope === 'sec' && /^Podstawa|^Model zakłada/.test(e)))) return false;
+  const lim = (eta || 100) / 100 + 1e-9;
+  return R.checks.every(c => {
+    if (c.info) return true;
+    if (scope === 'sec' && (/^Podstawa/.test(c.grp) || c.id === 'KRP')) return true;
+    if (scope === 'base' && !/^Podstawa/.test(c.grp) && c.id !== 'KRP') return true;
+    return c.util !== null && isFinite(c.util) && c.util <= lim;
+  });
+};
+J.secCandidates = function (st) {
+  const d = st.przekroj, typ = d.typ;
+  if (typ === 'walc') return P.lista(d.seria).map(nr => ({ typ, seria: d.seria, nr }));
+  if (typ === 'rura') { if (d.seria === 'wlasna') return []; return P.lista(d.seria).map(nr => ({ typ, seria: d.seria, nr, wyk: d.wyk })); }
+  if (typ === 'chs') { if (d.seria === 'wlasna') return []; return P.lista('CHS').map(nr => ({ typ, seria: 'CHS', nr, wyk: d.wyk })); }
+  if (typ === 'spaw') {
+    const out = [], h = U.num(d.h), b = U.num(d.bg), bd = U.num(d.bd || d.bg);
+    [8, 10, 12, 15, 16, 18, 20, 22, 25, 28, 30, 35, 40].forEach(tf => [6, 8, 10, 12, 14, 16, 20].forEach(tw => { if (tw <= tf + 4 && 2 * tf < h) out.push(Object.assign({}, d, { tg: tf, td: tf * (U.num(d.td) / Math.max(1, U.num(d.tg)) || 1), tw })); }));
+    void b; void bd;
+    return out;
+  }
+  return [];
+};
+J.massOf = (d) => { try { return P.props(d).masa; } catch (e) { return Infinity; } };
+// dobór przekroju: najlżejszy kształtownik serii spełniający wszystkie warunki (bez podstawy) z wytężeniem ≤ η
+J.designSection = function (st0, eta) {
+  const st = U.clone(st0); if (!(st.podstawa && st.podstawa.podatna && st.podstawa.typ === 'sztywna')) st.podstawa = Object.assign({}, st.podstawa, { aktywna: false }); st.analiza = Object.assign({}, st.analiza, { ogolna: false });
+  const cand = J.secCandidates(st).map(d => ({ d, m: J.massOf(d) })).filter(c => isFinite(c.m)).sort((a, b) => a.m - b.m);
+  if (!cand.length) return { err: 'Brak katalogu do doboru (wymiary dowolne) – zmień rodzaj lub serię przekroju.' };
+  const memo = {};
+  const ok = (i) => { if (memo[i] !== undefined) return memo[i]; const s2 = U.clone(st); s2.przekroj = cand[i].d; let r; try { r = J.run(s2); } catch (e) { r = null; } memo[i] = J.passes(r, eta, 'sec'); return memo[i]; };
+  let lo = 0, hi = cand.length - 1;
+  if (!ok(hi)) return { err: `Żaden kształtownik ${st.przekroj.typ === 'walc' ? 'serii ' + st.przekroj.seria : 'tego rodzaju'} nie spełnia warunków przy wytężeniu ≤ ${eta}%.` };
+  while (lo < hi) { const m = Math.floor((lo + hi) / 2); if (ok(m)) hi = m; else lo = m + 1; }
+  // sprawdzenie lżejszych (brak ścisłej monotoniczności – np. klasa przekroju)
+  for (let i = Math.max(0, lo - 3); i < lo; i++) if (ok(i)) { lo = i; break; }
+  return { d: cand[lo].d, masa: cand[lo].m, n: Object.keys(memo).length };
+};
+// dobór podstawy: najmniejsza masa blachy (+ koszt kotew) spełniająca warunki dla sił z bieżących wyników
+J.designBase = function (st, R, eta) {
+  if (!R || !R.sec || !R.base || !R.baseForces) return { err: 'Brak wyników analizy – usuń błędy danych.' };
+  const sec = R.sec, ndp = R.ndp, lim = (eta || 100) / 100;
+  const o = st.podstawa, fixed = o.typ === 'sztywna' && sec.kind !== 'CHS';
+  const h = sec.h, b = sec.kind === 'I' ? Math.max(sec.bg, sec.bd) : sec.b;
+  const ds = ['M16', 'M20', 'M24', 'M27', 'M30', 'M36', 'M42', 'M48'], kls = ['5.6', '8.8'];
+  const tps = [15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80];
+  let best = null;
+  const forces = R.baseForces;
+  ds.forEach(dn => kls.forEach(kl => {
+    const d = BS.M.SRUBY[dn].d, d0 = BS.M.d0Kotwy(d), ez = Math.max(50, Math.ceil(1.5 * d0 / 5) * 5);
+    const extList = fixed ? [2 * ez + 30, 2 * ez + 60, 2 * ez + 90, 2 * ez + 130] : [40, 60];
+    extList.forEach(ext => {
+      const lp = Math.ceil((h + 2 * ext) / 10) * 10;
+      [Math.max(30, Math.ceil(1.2 * d0 / 5) * 5 + 10), 60, 80].forEach(ey => {
+        const bp = Math.ceil((b + 2 * Math.max(ey - 10, 30)) / 10) * 10;
+        const w = Math.max(b + 2 * 20, bp - 2 * Math.max(ey, Math.ceil(1.2 * d0)));
+        for (const tp of tps) {
+          const s2 = U.clone(st);
+          Object.assign(s2.podstawa, { lp, bp, tp });
+          Object.assign(s2.podstawa.kotwy, { d: dn, kl, ez, w, uklad: fixed ? 'zew' : (s2.podstawa.kotwy.uklad === 'os' ? 'os' : 'wew') });
+          let C; try { C = PB.components(s2, sec, R.base, ndp); } catch (e) { continue; }
+          if (C.err.length) continue;
+          let u = 0; for (const f of forces) { const r = PB.check(C, f, ndp, sec); u = Math.max(u, r.u); if (u > lim) break; }
+          if (u <= lim) {
+            const cost = 7.85e-6 * lp * bp * tp + (fixed ? 4 : C.nb) * BS.M.SRUBY[dn].As * (kl === '8.8' ? 1.6 : 1) * 0.004;
+            if (!best || cost < best.cost) best = { lp, bp, tp, d: dn, kl, ez, w, u, cost };
+            break;
+          }
+        }
+      });
+    });
+  }));
+  if (!best) return { err: 'Nie znaleziono podstawy spełniającej warunki w zakresie doboru (kotwy do M48, blacha do 80 mm) – rozważ żebra usztywniające lub podstawę z trawersami.' };
+  return best;
 };
 
 })(typeof globalThis !== 'undefined' ? globalThis : this);
