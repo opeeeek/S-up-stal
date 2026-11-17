@@ -15,15 +15,26 @@ const s3 = Math.sqrt(3);
 
 /* ---------------------------------------------------------- klasyfikacja (tabl. 5.2) */
 // położenie osi obojętnej plastycznej przy sile Nc (ściskanie +) i ściskanej stronie Mpos (oś z)
+// tablica pola przekroju powyżej poziomu z (i na prawo od y) – liczona raz dla przekroju, interpolacja liniowa
+function areaTab(sec, ax) {
+  const key = ax === 'y' ? '_tabY' : '_tabZ';
+  if (sec[key]) return sec[key];
+  const n = 240, a0 = ax === 'y' ? sec.ymin : 0, a1 = ax === 'y' ? sec.ymax : sec.h, xs = [], As = [];
+  for (let i = 0; i <= n; i++) { const c = a0 + (a1 - a0) * i / n; xs.push(c); As.push(i === 0 ? sec.A : i === n ? 0 : P.integrals(ax === 'y' ? P.clipY(sec.rings, c) : P.clip(sec.rings, c, true), 0).A); }
+  Object.defineProperty(sec, key, { value: { xs, As }, enumerable: false });
+  return sec[key];
+}
+// położenie, w którym pole „powyżej” = Aab (funkcja malejąca)
+function invTab(t, Aab) {
+  const { xs, As } = t;
+  if (Aab >= As[0]) return xs[0];
+  for (let i = 1; i < xs.length; i++) if (As[i] <= Aab) { const f = (As[i - 1] - Aab) / Math.max(1e-12, As[i - 1] - As[i]); return xs[i - 1] + f * (xs[i] - xs[i - 1]); }
+  return xs[xs.length - 1];
+}
 function plasticNA(sec, fy, Nc, Mpos) {
   const Ac = U.clamp((sec.A + Nc / fy) / 2, 0, sec.A);
-  let lo = 0, hi = sec.h;
-  for (let k = 0; k < 60; k++) {
-    const m = (lo + hi) / 2;
-    const a = P.integrals(P.clip(sec.rings, m, Mpos), 0).A; // pole po stronie ściskanej
-    if (Mpos) { if (a > Ac) lo = m; else hi = m; } else { if (a > Ac) hi = m; else lo = m; }
-  }
-  return (lo + hi) / 2;
+  const t = areaTab(sec, 'z');
+  return invTab(t, Mpos ? Ac : sec.A - Ac);       // Mpos: pole ściskane powyżej osi = Ac
 }
 R.plasticNA = plasticNA;
 // klasa ścianki wewnętrznej przy rozkładzie (α – plastycznie, ψ – sprężyście)
@@ -41,14 +52,8 @@ R.plasticNA = plasticNA;
 // oś obojętna plastyczna w kierunku y (zginanie M_z): pole po stronie ściskanej (+y gdy Mpos) = (A + Nc/fy)/2
 function plasticNAy(sec, fy, Nc, Mpos) {
   const Ac = U.clamp((sec.A + Nc / fy) / 2, 0, sec.A);
-  let lo = sec.ymin, hi = sec.ymax;
-  for (let k = 0; k < 60; k++) {
-    const m = (lo + hi) / 2;
-    const ar = P.integrals(P.clipY(sec.rings, m), 0).A;     // pole po stronie y ≥ m
-    const a = Mpos ? ar : sec.A - ar;
-    if (Mpos) { if (a > Ac) lo = m; else hi = m; } else { if (a > Ac) hi = m; else lo = m; }
-  }
-  return (lo + hi) / 2;
+  const t = areaTab(sec, 'y');
+  return invTab(t, Mpos ? Ac : sec.A - Ac);       // Mpos: pole ściskane po stronie +y = Ac
 }
 R.plasticNAy = plasticNAy;
 // klasa ścianki wewnętrznej (α – rozkład plastyczny, ψ – sprężysty)
@@ -290,7 +295,10 @@ R.basic = function (sec, mat, ndp) {
 /* ---------------------------------------------------------- kontekst kombinacji: klasa przy (N, M_y, M_z) */
 R.ctx = function (sec, b, N, My, Mz) {
   const fy = b.fy;
-  const k = R.classCol(sec, fy, N, My, Mz);
+  const ck = Math.round(N / b.Npl * 2e4) + '|' + Math.round(My / b.Mply * 2e4) + '|' + Math.round(Mz / b.Mplz * 2e4);
+  if (!sec._cls) Object.defineProperty(sec, '_cls', { value: new Map(), enumerable: false });
+  let k = sec._cls.get(ck);
+  if (!k) { k = R.classCol(sec, fy, N, My, Mz); if (sec._cls.size < 20000) sec._cls.set(ck, k); }
   const cls = k.cls;
   let Wy, Wz, Aeff = sec.A, eNy = 0, effNote = null;
   if (cls <= 2) { Wy = sec.Wpl_y; Wz = sec.Wpl_z; }

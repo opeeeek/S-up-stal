@@ -157,7 +157,7 @@ T.ftBase = (md, sec) => ({ xs: md.xs, EIy: U.E * sec.Iy, EIz: U.E * sec.Iz, EIw:
 T.ncrAll = function (md, sec, Nel, ns, cache) {
   let Nmax = 0; for (let e = 0; e < md.ne; e++) Nmax = Math.max(Nmax, Nel[e]);
   if (!(Nmax > 1e-6)) return { Nmax: 0, y: { alpha: Infinity }, z: { alpha: Infinity }, T: { alpha: Infinity }, TF: { alpha: Infinity } };
-  const key = (ns ? 'ns|' : 's|') + Array.from(Nel).map(v => Math.round(Math.max(0, v) / Nmax * 500)).join(',');
+  const key = (ns ? 'ns|' : 's|') + Array.from(Nel).map(v => Math.round(Math.max(0, v) / Nmax * 200)).join(',');
   if (cache && cache[key]) return Object.assign({ Nmax }, cache[key]);
   const Nn = Float64Array.from(Nel, v => Math.max(0, v) / Nmax);   // rozkład jednostkowy (N_max = 1)
   const o = {};
@@ -471,13 +471,14 @@ T.general = function (c) {
   let aUlt = Infinity, at = null;
   const pts = []; let iN = 0, iM = 0;
   for (let i = 0; i < xs3.length; i++) { if (Fk.N[i] > Fk.N[iN]) iN = i; if (Math.abs(Fk.y.M[i]) > Math.abs(Fk.y.M[iM])) iM = i; }
-  pts.push(iN, iM); for (let i = 0; i < xs3.length; i += 6) pts.push(i);
+  pts.push(iN, iM, 0, xs3.length - 1); for (let i = 0; i < xs3.length; i += 12) pts.push(i);
   Array.from(new Set(pts)).forEach(i => {
     const N = Fk.N[i], My = Fk.y.M[i];
-    const u1 = (lam) => { const cx = R.ctx(sec, bK, lam * N, lam * My, 0); const r = R.atPoint(sec, bK, ndpK, { N: lam * N, My: lam * My }, cx); return Math.max(r.uMN, r.uN); };
+    const cx = R.ctx(sec, bK, N, My, 0);
+    const u1 = (lam) => { const r = R.atPoint(sec, bK, ndpK, { N: lam * N, My: lam * My }, cx); return Math.max(r.uMN, r.uN); };
     if (u1(1) <= 0) return;
     let lo = 0, hi = 1; while (u1(hi) < 1 && hi < 1e4) hi *= 2;
-    for (let k = 0; k < 50; k++) { const m = (lo + hi) / 2; if (u1(m) < 1) lo = m; else hi = m; }
+    for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (u1(m) < 1) lo = m; else hi = m; }
     const a = (lo + hi) / 2; if (a < aUlt) { aUlt = a; at = xs3[i]; }
   });
   // α_cr,op: postać z płaszczyzny (u, φ) przy N(x) i M_y(x) kombinacji

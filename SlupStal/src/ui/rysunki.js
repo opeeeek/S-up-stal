@@ -184,7 +184,7 @@ D.bindHeight = function (root) {
 // pl: 'y' (M_y, obciążenia w kierunku z) | 'z' (M_z, obciążenia w kierunku y); o: { W, H, diag: 'M'|'V'|'N'|'w'|'buck', loadsOn: Set, sel }
 D.scheme = function (St, R, pl, o) {
   o = o || {};
-  const W = o.W || 300, H = o.H || 470, mt = 70, mb = 62, hh = H - mt - mb, cx = W * (o.cxf || 0.38), cw = 13;
+  const W = o.W || 300, H = o.H || 470, mt = 104, mb = 62, hh = H - mt - mb, cx = W * (o.cxf || 0.38), cw = 13;
   const Hm = U.num(St.geom.H) || 1, Hmm = Hm * 1000;
   const Y = x => mt + (1 - x / Hmm) * hh;
   const md = R && R.md, bc = St.podpory || {};
@@ -205,7 +205,7 @@ D.scheme = function (St, R, pl, o) {
   else if (gr === 'utw') sup += hatch(cx, yT, cw + 30, -1) + tx(cx + cw / 2 + 18, yT - 10, 'utwierdzenie', { fs: 8.5, a: 'start', c: C.mut });
   else if (gr === 'utwp') sup += hatch(cx, yT - 8, cw + 30, -1) + `<circle cx="${cx - 7}" cy="${yT - 4}" r="3" fill="none" stroke="${C.ink}"/><circle cx="${cx + 7}" cy="${yT - 4}" r="3" fill="none" stroke="${C.ink}"/>` + tx(cx + cw / 2 + 18, yT - 10, 'utwierdzenie przesuwne', { fs: 8.5, a: 'start', c: C.mut });
   else if (gr === 'spr') sup += `<path d="M${cx + cw / 2},${yT + 4} l6,0 l3,-5 l3,10 l3,-10 l3,10 l3,-5 l6,0" fill="none" stroke="${C.ink}"/>` + hatchV(cx + cw / 2 + 28, yT + 4, 22, 1) + tx(cx + cw / 2 + 36, yT - 8, `sprężyna k = ${fmt(U.num(pl === 'y' ? bc.gora.khz : bc.gora.khy), 0)} kN/m`, { fs: 8.5, a: 'start', c: C.mut });
-  else sup += tx(cx + cw / 2 + 8, yT - 8, 'swobodny', { fs: 8.5, a: 'start', c: C.mut });
+  else sup += tx(cx + cw / 2 + 6, yT + 12, 'swobodny', { fs: 8.5, a: 'start', c: C.mut });
   s += `<g class="supp" data-sup="${pl}" style="cursor:pointer"><title>Warunki podparcia – kliknij, aby zmienić</title>${sup}<rect x="${cx - 40}" y="${yT - 24}" width="110" height="26" fill="transparent"/><rect x="${cx - 40}" y="${Y(0)}" width="80" height="34" fill="transparent"/></g>`;
   // stężenia w płaszczyźnie
   (St.stezenia || []).forEach((z, i) => {
@@ -229,7 +229,8 @@ D.scheme = function (St, R, pl, o) {
         const off = e ? Math.sign(e) * Math.min(cw / 2 + 10, 6 + Math.abs(e) / 40) : 0;
         const k = nTop++, dx = (k % 4) * 9 - 13, xa = cx + dx + off;
         const F = U.num(p.F);
-        s += g0 + (F >= 0 ? arrowL(xa, y - 34 - (k % 2) * 6, xa, y - 2, col, 1.6) : arrowL(xa, y - 2, xa, y - 34 - (k % 2) * 6, col, 1.6)) + tx(xa, y - 38 - (k % 2) * 6 - 2, `${esc(L.id)} ${fmt(Math.abs(F), 0)}`, { fs: 9, c: col, w: 650 }) + (e ? tx(xa + 4, y - 14, `e = ${fmt(e, 0)}`, { fs: 8, c: col, a: 'start' }) : '') + '</g>';
+        const top = x >= Hmm - 1, yl = top ? y - 30 - (k % 3) * 11 : y - 30;
+        s += g0 + (F >= 0 ? arrowL(xa, top ? y - 28 : y - 26, xa, y - 2, col, 1.6) : arrowL(xa, y - 2, xa, top ? y - 28 : y - 26, col, 1.6)) + (top ? `<line x1="${xa}" y1="${y - 28}" x2="${xa}" y2="${yl + 3}" stroke="${col}" stroke-width="0.6" stroke-dasharray="2 2"/>` : '') + tx(xa + (k % 2 ? 3 : -3), yl, `${esc(L.id)} ${fmt(Math.abs(F), 0)}${e ? ` (e ${fmt(e, 0)})` : ''}`, { fs: 9, c: col, w: 650, a: k % 2 ? 'start' : 'end' }) + '</g>';
       } else if (p.typ === 'H' && p.kier === kier) {
         const x = p.x === '' || p.x === undefined ? Hmm : U.num(p.x) * 1000, y = Y(x), F = U.num(p.F), d = F >= 0 ? 1 : -1;
         const x0 = cx - cw / 2 - 4 - 30, x1 = cx - cw / 2 - 2;
@@ -326,10 +327,10 @@ D.basePlate = function (C0, sec, o) {
   const W = o.W || 620, Hh = o.H || 360;
   const { lp, bp, tp } = C0;
   // rzut: z pionowo (l_p), y poziomo (b_p)
-  const scP = Math.min((W * 0.5 - 70) / bp, (Hh - 80) / lp);
-  const cxP = 60 + bp * scP / 2, cyP = Hh / 2 + 6;
+  const scP = Math.min((W * 0.5 - 110) / bp, (Hh - 96) / lp);
+  const cxP = 60 + bp * scP / 2, cyP = Hh / 2 + 2;
   const X = (y) => cxP + y * scP, Y = (z) => cyP - z * scP;
-  let s = svgOpen(W, Hh, 'class="basesvg"');
+  let s = svgOpen(W, Hh, 'class="basesvg" style="max-width:100%;height:auto"');
   s += tx(8, 16, 'Podstawa słupa – rzut', { fs: 11.5, w: 650, a: 'start' });
   s += `<rect x="${X(-bp / 2)}" y="${Y(lp / 2)}" width="${bp * scP}" height="${lp * scP}" fill="#e3e8f0" stroke="${C.ink}" stroke-width="1.2"/>`;
   // strefy docisku (króćce teowe)
@@ -347,18 +348,18 @@ D.basePlate = function (C0, sec, o) {
   else if (C0.nb === 2) [1, -1].forEach(sy => anchors.push([sy * C0.w / 2, 0]));
   else [1, -1].forEach(sg => [1, -1].forEach(sy => anchors.push([sy * C0.w / 2, sg * C0.zT])));
   anchors.forEach(([y, z]) => { s += `<circle cx="${X(y)}" cy="${Y(z)}" r="${Math.max(3, C0.d0 / 2 * scP)}" fill="#ffffff" stroke="${C.red}" stroke-width="1.3"/><circle cx="${X(y)}" cy="${Y(z)}" r="${Math.max(1.5, C0.d / 2 * scP)}" fill="${C.red}" fill-opacity="0.5"/>`; });
-  s += Q.dimH(X(-bp / 2), X(bp / 2), Y(lp / 2) - 12, `b_p = ${fmt(bp, 0)}`);
-  s += Q.dimV(X(-bp / 2) - 14, Y(-lp / 2), Y(lp / 2), `l_p = ${fmt(lp, 0)}`);
+  s += Q.dimH(X(-bp / 2), X(bp / 2), Y(lp / 2) - 12, `b<tspan baseline-shift="sub" font-size="75%">p</tspan> = ${fmt(bp, 0)}`);
+  s += Q.dimV(X(-bp / 2) - 14, Y(-lp / 2), Y(lp / 2), `l<tspan baseline-shift="sub" font-size="75%">p</tspan> = ${fmt(lp, 0)}`);
   if (anchors.length) { const yA = Math.max(...anchors.map(a => a[0])), yB = Math.min(...anchors.map(a => a[0])); s += Q.dimH(X(yB), X(yA), Y(-lp / 2) + 14, `w = ${fmt(C0.w, 0)}`, { below: true }); }
-  if (C0.uk === 'zew') s += Q.dimV(X(bp / 2) + 14, Y(C0.zT), Y(-C0.zT), `2z_T = ${fmt(2 * C0.zT, 0)}`, { right: true });
-  s += tx(X(0), Y(-lp / 2) + 38, `${C0.nb} × ${o.dName || ''} kl. ${o.kl || ''}`, { fs: 9.5, c: C.red });
+  if (C0.uk === 'zew') s += Q.dimV(X(bp / 2) + 14, Y(C0.zT), Y(-C0.zT), `2z<tspan baseline-shift="sub" font-size="75%">T</tspan> = ${fmt(2 * C0.zT, 0)}`, { right: true });
+  s += tx(X(bp / 2) + 6, Y(lp / 2) + 4, `${C0.nb} × ${o.dName || ''} kl. ${o.kl || ''}`, { fs: 9.5, c: C.red, a: 'start' });
   // widok z boku
-  const x0 = W * 0.56, wv = W - x0 - 20, scV = Math.min(wv / lp, 1.2 * scP);
+  const x0 = W * 0.56, wv = W - x0 - 80, scV = Math.min(wv / lp, 1.2 * scP);
   const cxV = x0 + wv / 2, yP = Hh * 0.52;
   const XV = (z) => cxV + z * scV;
   s += tx(x0, 16, 'Widok (płaszczyzna x–z)', { fs: 11.5, w: 650, a: 'start' });
   const tpv = Math.max(4, tp * scV), tgv = Math.max(3, C0.tg * scV);
-  s += `<rect x="${XV(-lp / 2 - 60)}" y="${yP + tpv + tgv}" width="${(lp + 120) * scV}" height="${60}" fill="#eef0f3" stroke="${C.mut}"/>`;
+  s += `<rect x="${XV(-lp / 2) - 20}" y="${yP + tpv + tgv}" width="${lp * scV + 40}" height="${60}" fill="#eef0f3" stroke="${C.mut}"/>`;
   s += `<rect x="${XV(-lp / 2)}" y="${yP + tpv}" width="${lp * scV}" height="${tgv}" fill="#d9dde3" stroke="${C.mut}" stroke-dasharray="3 2"/>`;
   s += `<rect x="${XV(-lp / 2)}" y="${yP}" width="${lp * scV}" height="${tpv}" fill="#b9c3d3" stroke="${C.ink}"/>`;
   const h2 = sec.h / 2, tf = sec.kind === 'I' ? sec.tg : sec.t;
@@ -367,8 +368,8 @@ D.basePlate = function (C0, sec, o) {
   // spoiny
   [-h2, h2].forEach(z => { const sg = z > 0 ? 1 : -1, a = Math.max(3, C0.af * scV * 1.4); s += `<path d="M${XV(z)},${yP} l${sg * a},0 l${-sg * a},${-a} z" fill="${C.ink}"/>`; });
   if (C0.uk === 'zew') [1, -1].forEach(sg => { const xx = XV(sg * C0.zT); s += `<line x1="${xx}" y1="${yP - 16}" x2="${xx}" y2="${yP + tpv + tgv + 56}" stroke="${C.red}" stroke-width="${Math.max(1.5, C0.d * scV)}"/><rect x="${xx - 6}" y="${yP - 10}" width="12" height="7" fill="${C.red}" fill-opacity="0.7"/>`; });
-  s += Q.dimV(XV(lp / 2) + 12, yP, yP + tpv, `t_p = ${fmt(tp, 0)}`, { right: true }) + tx(XV(lp / 2) + 12, yP + tpv + tgv + 4, `podlewka ${fmt(C0.tg, 0)}`, { fs: 9, a: 'start', c: C.mut });
-  s += tx(XV(0), yP + tpv + tgv + 40, `beton ${esc(o.beton || '')}: f_jd = ${fmt(C0.fjd, 1)} MPa`.replace('_jd', '<tspan baseline-shift="sub" font-size="75%">jd</tspan>'), { fs: 9.5, c: C.ink2 });
+  s += Q.dimV(XV(lp / 2) + 26, yP, yP + tpv, `t<tspan baseline-shift="sub" font-size="75%">p</tspan> = ${fmt(tp, 0)}`, { right: true }) + tx(XV(lp / 2) + 26, yP + tpv + tgv + 12, `podlewka ${fmt(C0.tg, 0)}`, { fs: 9, a: 'start', c: C.mut });
+  s += tx(XV(0), yP + tpv + tgv + 76, `beton ${esc(o.beton || '')}: f_jd = ${fmt(C0.fjd, 1)} MPa`.replace('_jd', '<tspan baseline-shift="sub" font-size="75%">jd</tspan>'), { fs: 9.5, c: C.ink2 });
   s += tx(8, Hh - 6, 'strefy docisku (króćce teowe, szerokość c) – kolor pomarańczowy; kotwy – czerwone', { fs: 9, a: 'start', c: C.mut });
   return s + '</svg>';
 };

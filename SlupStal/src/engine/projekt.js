@@ -278,7 +278,8 @@ J.run = function (st0, opt) {
     else if (maxMz > 0.02 * base.Mcz) out.info.push('Metoda ogólna 6.3.4 – nie dotyczy: występuje zginanie M_z (metoda dotyczy elementów obciążonych w płaszczyźnie).');
     else {
       let g = null;
-      sgn.forEach(c => {
+      const rank = res.map(cr => ({ c: cr.combo, u: Math.max(0, ...cr.variants.map(v => v.mem ? Math.max(0, ...v.mem.segs.map(s => s.u)) : 0)) })).sort((a, b) => b.u - a.u).slice(0, 3).map(q => q.c);
+      rank.forEach(c => {
         const c1 = S.combine1(md, an, c);
         const o = { phi: imp.phi, e0L: { y: e0L.y, z: 0 }, var: md.sway.y ? { pl: 'y', s: Math.sign(S.maxAbs(c1.y.w).v) || 1 } : { pl: 'y', s: Math.sign(S.maxAbs(c1.y.w).v) || 1 }, sgnB: { y: Math.sign(S.maxAbs(c1.y.w).v) || 1, z: 1 } };
         if (!md.sway.y) o.phi = 0;
@@ -311,8 +312,9 @@ J.run = function (st0, opt) {
     let C = null;
     try { C = PB.components(st, sec, base, ndp); } catch (e) { err('Podstawa: ' + e.message); }
     if (C) {
-      C.err.forEach(err); C.warn.forEach(wrn);
+      C.warn.forEach(wrn);
       out.pb = { C, worst: {} };
+      if (C.err.length) out.checks.push(BS.check({ id: 'PBG', grp: 'Podstawa słupa (PN-EN 1993-1-8)', n: 'Geometria podstawy: ' + C.err.map(e => e.replace(/^Podstawa: /, '')).join(' '), ref: 'PN-EN 1993-1-8, 6.2.5, tabl. 3.3', Ed: 1, Rd: 0, unit: '-', util: Infinity, forceStatus: 'fail', d: { C } }));
       if (!C.err.length) {
         const fixedModel = md.bc.dol.y === 'utw' || md.bc.dol.z === 'utw' || !!out.baseSpring;
         if (C.fixed && !fixedModel) wrn('Podstawa zaprojektowana jako utwierdzona, a w modelu podstawa jest przegubowa – sprawdź zgodność modelu.');

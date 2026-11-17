@@ -18,10 +18,13 @@ const f = (v, n) => fm(v, n === undefined ? 2 : n);
 const kN = (v) => fm(v / 1e3, 2), kNm = (v) => fm(v / 1e6, 2), cm2 = (v) => fm(v / 100, 2), cm4 = (v) => fm(v / 1e4, 1), cm3 = (v) => fm(v / 1e3, 1);
 const sym = (s) => esc(s).replace(/_\{([^}]*)\}/g, '<sub>$1</sub>').replace(/\^\{([^}]*)\}/g, '<sup>$1</sup>').replace(/_([0-9A-Za-ząćęłńóśźżθφλαβγχψ]+(?:,[0-9A-Za-ząćęłńóśźżθ.]+)*)/g, '<sub>$1</sub>');
 RP.sym = sym;
+// indeksy w wyrażeniach (bez escapowania – wyrażenia są HTML programu)
+const symF = (s) => String(s).replace(/_\{([^}]*)\}/g, '<sub>$1</sub>').replace(/\^\{([^}]*)\}/g, '<sup>$1</sup>').replace(/_([0-9A-Za-ząćęłńóśźżθφλαβγχψ]+(?:,[0-9A-Za-ząćęłńóśźżθ.]+)*)/g, '<sub>$1</sub>');
+RP.symF = symF;
 const eq = (lhs, fx, sb, val, unit, ref, stt) => {
   let s = `<div class="eq">${sym(lhs)}`;
-  if (fx) s += ` = ${fx}`;
-  if (sb) s += ` = ${sb}`;
+  if (fx) s += ` = ${symF(fx)}`;
+  if (sb) s += ` = ${symF(sb)}`;
   if (val !== undefined && val !== null && val !== '') s += ` = <b>${val}</b>`;
   if (unit) s += ` ${unit}`;
   if (stt) s += ` <span class="${stt[0]}">${stt[1]}</span>`;
@@ -55,7 +58,7 @@ RP.tok = function (c, R, S) {
   const sec = R.sec, b = R.base, ndp = R.ndp, mat = R.mat, fy = mat.fy, d = c.d || {};
   const g0 = ndp.gM0, g1 = ndp.gM1;
   let h = '';
-  const head = (t) => `<h3>${t}</h3>`;
+  const head = (t) => `<h3>${symF(t)}</h3>`;
   switch (true) {
     case c.id === 'acr': {
       const a = d.alphaMin;
@@ -148,7 +151,7 @@ RP.tok = function (c, R, S) {
     }
     case c.id === 'BT': {
       const t = d.f;
-      h += head(c.n);
+      h += head(esc(c.n));
       h += line(`i<sub>0</sub>² = (I<sub>y</sub> + I<sub>z</sub>)/A + z<sub>0</sub>² = ${fm(t.i02 / 100, 2)} cm²`);
       if (t.manual) h += eq('N_{cr,T}', '(GI_t + π²EI_w/L_{cr,T}²)/i_0²', `(81000·${cm4(sec.It)}·10⁴ + π²·210000·${fm(sec.Iw / 1e9, 2)}·10⁹/${fm(t.LcrT, 0)}²)/${fm(t.i02, 0)}`, kN(t.NcrT), 'kN', 'L_cr,T ręcznie');
       else h += line(`N<sub>cr,T</sub> (postać skrętna, MES – teoria Własowa): <b>${kN(t.NcrT)} kN</b>${isFinite(t.LcrT) ? `, L<sub>cr,T</sub> ≈ ${fm(t.LcrT / 1000, 2)} m` : ''}; N<sub>cr,TF</sub> (postać sprzężona u–φ ze stężeniami na wysokości pasa): <b>${kN(t.NcrTF)} kN</b>`, '6.3.1.4');
@@ -242,7 +245,7 @@ RP.tok = function (c, R, S) {
       } else { h += line(`t<sub>max</sub> (σ<sub>Ed</sub> = 0,75·f<sub>y</sub>, T<sub>Ed</sub> = ${fm(d.TEd, 0)} °C) = <b>${fm(d.tm.t, 0)} mm</b>`, 'tabl. 2.1'); h += verd(fm(c.Ed, 0), fm(d.tm.t, 0), c.util, 'mm'); }
       break;
     }
-    default: h += line(esc(c.n));
+    default: h += line(sym(c.n));
   }
   return h;
 };
@@ -250,7 +253,7 @@ RP.tok = function (c, R, S) {
 /* ---------------------------------------------------------------- podstawa */
 RP.tokBase = function (c, R, S) {
   const C = R.pb.C, ndp = R.ndp, d = c.d || {}, r = d.r || {}, fo = d.f || {};
-  let h = `<h3>${esc(c.n)}</h3>`;
+  let h = `<h3>${sym(c.n)}</h3>`;
   if (d.f) h += line(`${cmb(fo.combo)}${fo.vr && R.method !== 'I' ? ' · ' + esc(fo.vr) : ''}: N<sub>Ed</sub> = ${kN(fo.N)} kN (+ ściskanie), M<sub>y,Ed</sub> = ${kNm(fo.My)} kNm, M<sub>z,Ed</sub> = ${kNm(fo.Mz)} kNm, V<sub>y,Ed</sub> = ${kN(fo.Vy)} kN, V<sub>z,Ed</sub> = ${kN(fo.Vz)} kN`);
   const fjd = () => eq('f_{cd}', 'α_{cc}·f_{ck}/γ_c', `${fm(ndp.acc, 2)}·${fm(C.fck, 0)}/${fm(ndp.gc, 2)}`, fm(C.fcd, 2), 'MPa', 'PN-EN 1992-1-1, 3.1.6') +
     (C.kjMan ? eq('k_j', '', '', fm(C.kj, 3), '', 'przyjęto ręcznie') : eq('k_j', '√(A_{c1}/A_{c0}) ≤ 3', `√(${fm(Math.max(C.a1, C.lp), 0)}·${fm(Math.max(C.b1, C.bp), 0)}/(${fm(C.lp, 0)}·${fm(C.bp, 0)}))`, fm(C.kj, 3), '', 'PN-EN 1992-1-1, 6.7')) +
@@ -450,7 +453,7 @@ RP.build = function (S, R, opt) {
   }
   // podsumowanie
   h += `<h2>${no++}. Zestawienie wyników</h2>`;
-  h += tbl(['sprawdzenie', 'punkt normy', 'wykorzystanie', 'status'], R.checks.map(c => [esc(c.n), esc(c.ref), c.util !== null && isFinite(c.util) ? fm(c.util * 100, 1) + '%' : '∞', c.info ? (c.status === 'warn' ? '<span class="warn">uwaga</span>' : '<span class="info">informacja</span>') : c.status === 'fail' ? '<span class="fail">niespełniony</span>' : c.status === 'warn' ? '<span class="warn">uwaga</span>' : '<span class="ok">spełniony</span>']));
+  h += tbl(['sprawdzenie', 'punkt normy', 'wykorzystanie', 'status'], R.checks.map(c => [sym(c.n), esc(c.ref), c.util !== null && isFinite(c.util) ? fm(c.util * 100, 1) + '%' : '∞', c.info ? (c.status === 'warn' ? '<span class="warn">uwaga</span>' : '<span class="info">informacja</span>') : c.status === 'fail' ? '<span class="fail">niespełniony</span>' : c.status === 'warn' ? '<span class="warn">uwaga</span>' : '<span class="ok">spełniony</span>']));
   const fails = R.checks.filter(c => c.status === 'fail' && !c.info).length;
   h += `<div class="verdict">${fails ? `<span class="fail">✖ Niespełnione warunki: ${fails}</span>` : `<span class="ok">✔ Wszystkie warunki nośności i użytkowalności spełnione – maksymalne wytężenie η = ${fm(R.uMax * 100, 1)}%</span>`}</div>`;
   if (R.warnings.length) h += '<h3>Uwagi</h3>' + R.warnings.map(w => `<div class="eq warn">${esc(w)}</div>`).join('');

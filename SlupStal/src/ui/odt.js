@@ -1,6 +1,6 @@
 
 /* =====================================================================
-   BelkaStal – eksport raportu do edytowalnego pliku OpenDocument (.odt)
+   SłupStal – eksport raportu do edytowalnego pliku OpenDocument (.odt)
    (nagłówki, akapity, tabele, indeksy, rysunki SVG → PNG; ZIP „stored”)
    oraz wersja raportu bez odwołań do punktów normy (jak w BelkaŻB).
    ===================================================================== */

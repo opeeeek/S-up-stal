@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="SłupStal – projektowanie słupów stalowych według Eurokodów (PN-EN 1993) z odtwarzalnym raportem i pełnym tokiem obliczeń.">
+<title>SłupStal</title>
+<style id="appcss">/*@@CSS@@*/</style>
+</head>
+<body>
+
+<header id="top">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="3" style="fill:var(--brand1);stroke:var(--brand2)"/><path d="M10 6h12v2.6h-4.7v14.8H22V26H10v-2.6h4.7V8.6H10z" style="fill:var(--brand3)"/><path d="M7 26.2h18v2H7z" style="fill:var(--brand4)"/><path d="M10 6h12v1.3H10z" style="fill:var(--brand4)"/></svg>
+    <b>SłupStal</b><span class="tag">PN-EN 1993-1-1</span>
+  </div>
+  <input id="projName" title="Nazwa elementu" aria-label="Nazwa elementu" spellcheck="false">
+  <span id="fileName"></span>
+  <div class="tb">
+    <button id="bNew" data-act="new" title="Nowy projekt (Ctrl+N)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg><span class="lbl">Nowy</span></button>
+    <button id="bOpen" data-act="open" title="Otwórz plik projektu lub raport HTML (Ctrl+O)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z"/></svg><span class="lbl">Otwórz</span></button>
+    <button id="bSave" data-act="save" title="Zapisz (Ctrl+S)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12l3 3v15H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/></svg><span class="lbl">Zapisz</span></button>
+    <button id="bSaveAs" data-act="saveas" title="Zapisz jako (Ctrl+Shift+S)"><span class="lbl">Zapisz jako…</span></button>
+    <span class="sep"></span>
+    <button id="bPrint" data-act="print" title="Drukuj raport / zapisz do PDF (Ctrl+P)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="1"/><path d="M7 14h10v7H7z"/></svg><span class="lbl">Drukuj / PDF</span></button>
+    <button id="bExport" data-act="exporthtml" title="Zapisz raport jako plik HTML (z danymi projektu)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg><span class="lbl">Raport HTML</span></button>
+    <button id="bAbout" data-act="about" title="O programie" aria-label="O programie">?</button>
+  </div>
+  <div id="status" title="Kliknij – Podsumowanie">…</div>
+</header>
+<main>
+  <section id="out">
+    <nav class="tabs">
+      <button data-tab="data" class="on">Dane</button>
+      <button data-tab="sec">Przekrój i nośność</button>
+      <button data-tab="chart">Wykresy N, M, V, przemieszczenia</button>
+      <button data-tab="stab">Stateczność</button>
+      <button data-tab="base">Podstawa</button>
+      <button data-tab="fire">Pożar</button>
+      <button data-tab="sum">Podsumowanie</button>
+      <button data-tab="report">Raport obliczeń</button>
+    </nav>
+    <div class="pane on" id="p-data"><div class="datawrap"><div class="dleft"><div id="dsum"></div><div id="autobar"></div><div id="inputs"></div></div><div class="dsplit" id="dsplit" role="separator" aria-orientation="vertical" title="Przeciągnij, aby zmienić podział: dane | schemat"></div><aside id="dataside"></aside></div></div>
+    <div class="pane xres" id="p-sec"></div>
+    <div class="pane xres" id="p-chart"></div>
+    <div class="pane xres" id="p-stab"></div>
+    <div class="pane xres" id="p-base"></div>
+    <div class="pane xres" id="p-fire"></div>
+    <div class="pane" id="p-sum"></div>
+    <div class="pane" id="p-report"></div>
+  </section>
+</main>
+<div id="pop"></div>
+<div id="modal" role="dialog" aria-modal="true"></div>
+<div id="nmodal" role="dialog" aria-modal="true"></div>
+<div id="toast" role="status"></div>
+<input type="file" id="fileIn" accept=".slupstal,.json,.html,application/json,text/html" hidden>
+<!--@@SCRIPTS@@-->
+<script>BS.A.init();</script>
+</body>
+</html>

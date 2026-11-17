@@ -1,6 +1,6 @@
 
 /* =====================================================================
-   BelkaStal – wspólne narzędzia interfejsu (jak w BelkaŻB/SłupŻB):
+   SłupStal – wspólne narzędzia interfejsu (jak w BelkaStal/SłupŻB):
    formatowanie, symbole z indeksami, okna dialogowe, lista wartości
    typowych (▾), menu kontekstowe, kolory rysunków w motywie ciemnym,
    powiększanie i przesuwanie rysunków (Ctrl + kółko, przeciąganie).

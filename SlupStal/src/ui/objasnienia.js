@@ -1,0 +1,52 @@
+/* =====================================================================
+   SłupStal – objaśnienia punktów norm (okno po kliknięciu odnośnika):
+   streszczenie wymagania, wzór, podpowiedź projektowa.
+   Treść własna (omówienie), nie cytat norm.
+   ===================================================================== */
+(function () {
+'use strict';
+const O = window.BS.OBJ = {};
+const N = O.N = {
+  '5.2.1': { lab: 'PN-EN 1993-1-1, 5.2.1', t: 'Wpływ deformacji – analiza I lub II rzędu', s: 'Efekty II rzędu (wpływ przemieszczeń na siły wewnętrzne) można pominąć, gdy mnożnik obciążenia krytycznego całej konstrukcji α<sub>cr</sub> = F<sub>cr</sub>/F<sub>Ed</sub> ≥ 10 (analiza sprężysta). Program wyznacza α<sub>cr</sub> metodą elementów skończonych dla rzeczywistego rozkładu siły podłużnej w każdej kombinacji.', f: 'α<sub>cr</sub> = F<sub>cr</sub>/F<sub>Ed</sub> ≥ 10', h: 'Przy α<sub>cr</sub> < 10 w układzie przechyłowym wybierz analizę II rzędu z imperfekcjami (Analiza → metoda). Przy α<sub>cr</sub> < 3 zalecana pełna analiza II rzędu z imperfekcjami łukowymi.' },
+  '5.2.2': { lab: 'PN-EN 1993-1-1, 5.2.2', t: 'Metody sprawdzania stateczności', s: 'Stateczność można sprawdzić: (a) w całości w analizie globalnej II rzędu z imperfekcjami globalnymi i łukowymi – wtedy wystarcza sprawdzenie przekrojów; (b) analizą II rzędu z imperfekcją przechyłową i sprawdzeniem elementów wg 6.3 z długością wyboczeniową „nieprzechyłową”; (c) analizą I rzędu i sprawdzeniem elementów wg 6.3 z długością wyboczeniową z postaci globalnej.', f: '—', h: 'Program pozwala wybrać każdą z metod; we wszystkich wyznacza obciążenia krytyczne MES.' },
+  '5.3.2': { lab: 'PN-EN 1993-1-1, 5.3.2', t: 'Imperfekcje', s: 'Imperfekcja przechyłowa φ = φ<sub>0</sub>·α<sub>h</sub>·α<sub>m</sub> (φ<sub>0</sub> = 1/200) i łukowa e<sub>0</sub>/L zależna od krzywej wyboczeniowej (tabl. 5.1). Imperfekcję przechyłową można pominąć, gdy H<sub>Ed</sub> ≥ 0,15·V<sub>Ed</sub>. Imperfekcje stosuje się w niekorzystnym kierunku, w jednej płaszczyźnie naraz.', f: 'φ = φ<sub>0</sub>α<sub>h</sub>α<sub>m</sub>; α<sub>h</sub> = 2/√h; α<sub>m</sub> = √(0,5(1 + 1/m))', h: 'Program wprowadza imperfekcje jako geometrię początkową (obciążenie zastępcze K<sub>G</sub>·d<sub>0</sub>) z obu zwrotami.' },
+  '5.5': { lab: 'PN-EN 1993-1-1, 5.5', t: 'Klasyfikacja przekrojów', s: 'Klasa przekroju (1–4) określa, czy części ściskane mogą się uplastycznić przed miejscową utratą stateczności. Decyduje najmniej korzystna ścianka (c/t w tabl. 5.2 wobec ε = √(235/f<sub>y</sub>)) przy rzeczywistym rozkładzie naprężeń od N, M<sub>y</sub> i M<sub>z</sub>.', f: 'np. pas wspornikowy: c/t ≤ 9ε (kl. 1), 10ε (kl. 2), 14ε (kl. 3); rura okrągła d/t ≤ 50ε², 70ε², 90ε²', h: 'Klasa 4 – nośność z przekroju efektywnego (PN-EN 1993-1-5).' },
+  '6.2.3': { lab: 'PN-EN 1993-1-1, 6.2.3', t: 'Rozciąganie', s: 'Nośność przekroju rozciąganego – plastyczna nośność przekroju brutto (bez osłabień).', f: 'N<sub>pl,Rd</sub> = A·f<sub>y</sub>/γ<sub>M0</sub>', h: '' },
+  '6.2.4': { lab: 'PN-EN 1993-1-1, 6.2.4', t: 'Ściskanie – nośność przekroju', s: 'Dla przekrojów klas 1–3: A·f<sub>y</sub>/γ<sub>M0</sub>; dla klasy 4: A<sub>eff</sub>·f<sub>y</sub>/γ<sub>M0</sub>.', f: 'N<sub>c,Rd</sub> = A·f<sub>y</sub>/γ<sub>M0</sub>', h: '' },
+  '6.2.6': { lab: 'PN-EN 1993-1-1, 6.2.6', t: 'Ścinanie', s: 'Plastyczna nośność na ścinanie z pola czynnego A<sub>v</sub> (dwuteowniki: przy ścinaniu w płaszczyźnie środnika – wzór z promieniem zaokrąglenia, wzdłuż pasów – A − Σh<sub>w</sub>t<sub>w</sub>; rury – A·h/(b + h), A·b/(b + h), 2A/π).', f: 'V<sub>pl,Rd</sub> = A<sub>v</sub>·(f<sub>y</sub>/√3)/γ<sub>M0</sub>', h: 'Gdy V<sub>Ed</sub> > 0,5·V<sub>pl,Rd</sub>, nośność na zginanie redukuje się (6.2.8, 6.2.10).' },
+  '6.2.9': { lab: 'PN-EN 1993-1-1, 6.2.9', t: 'Zginanie z siłą podłużną', s: 'Klasy 1–2: zredukowane nośności plastyczne M<sub>N,y,Rd</sub>, M<sub>N,z,Rd</sub> i warunek dwukierunkowy (6.41) z wykładnikami α, β. Klasy 3–4: naprężenia normalne σ<sub>x,Ed</sub> ≤ f<sub>y</sub>/γ<sub>M0</sub> (6.42, 6.44).', f: '[M<sub>y</sub>/M<sub>N,y,Rd</sub>]<sup>α</sup> + [M<sub>z</sub>/M<sub>N,z,Rd</sub>]<sup>β</sup> ≤ 1', h: 'Program sprawdza przekrój w każdym punkcie siatki MES na całej wysokości słupa.' },
+  '6.3.1': { lab: 'PN-EN 1993-1-1, 6.3.1', t: 'Wyboczenie elementów ściskanych', s: 'Nośność na wyboczenie wynika ze smukłości względnej λ̄ = √(A·f<sub>y</sub>/N<sub>cr</sub>) i krzywej wyboczeniowej (tabl. 6.2). N<sub>cr</sub> program wyznacza MES dla rzeczywistych warunków podparcia, stężeń i rozkładu siły podłużnej – długość wyboczeniowa L<sub>cr</sub> = π√(EI/N<sub>cr</sub>) jest wynikiem, nie założeniem (można ją też podać ręcznie).', f: 'N<sub>b,Rd</sub> = χ·A·f<sub>y</sub>/γ<sub>M1</sub>; χ = 1/(Φ + √(Φ² − λ̄²))', h: 'Wyboczenie skrętne i giętno-skrętne (6.3.1.4) – dla przekrojów otwartych, także względem osi wymuszonej (stężenie przy jednym pasie).' },
+  '6.3.1.4': { lab: 'PN-EN 1993-1-1, 6.3.1.4', t: 'Wyboczenie skrętne i giętno-skrętne', s: 'Dla przekrojów otwartych sprawdza się postać skrętną (N<sub>cr,T</sub>) i giętno-skrętną (N<sub>cr,TF</sub>) z krzywą jak dla osi z–z. Program wyznacza obie wartości z analizy Własowa z warunkami skrętnymi końców i stężeniami (także mocowanymi do pasa).', f: 'λ̄<sub>T</sub> = √(A·f<sub>y</sub>/N<sub>cr</sub>), N<sub>cr</sub> = min(N<sub>cr,T</sub>; N<sub>cr,TF</sub>)', h: 'Rygle ścienne mocowane do jednego pasa nie zawsze stężają słup skutecznie – sprawdź postać względem osi wymuszonej.' },
+  '6.3.2': { lab: 'PN-EN 1993-1-1, 6.3.2', t: 'Zwichrzenie', s: 'Element zginany względem osi y–y może utracić stateczność przez boczne wygięcie ze skręceniem. M<sub>cr</sub> program liczy MES dla rozkładu M<sub>y</sub> kombinacji, z wysokością przyłożenia obciążeń poziomych i stężeniami.', f: 'M<sub>b,Rd</sub> = χ<sub>LT</sub>·W<sub>y</sub>·f<sub>y</sub>/γ<sub>M1</sub>', h: 'Przekroje zamknięte (rury) nie podlegają zwichrzeniu.' },
+  '6.3.3': { lab: 'PN-EN 1993-1-1, 6.3.3', t: 'Elementy ściskane i zginane – interakcja', s: 'Dwa warunki (6.61) i (6.62) łączą wyboczenie giętne, zwichrzenie i zginanie dwukierunkowe przez współczynniki interakcji k<sub>ij</sub> wg zał. A (metoda 1) lub B (metoda 2) i współczynniki C<sub>m</sub> zależne od wykresu momentów.', f: 'N/(χ<sub>y</sub>N<sub>Rk</sub>/γ<sub>M1</sub>) + k<sub>yy</sub>·M<sub>y</sub>/(χ<sub>LT</sub>M<sub>y,Rk</sub>/γ<sub>M1</sub>) + k<sub>yz</sub>·M<sub>z</sub>/(M<sub>z,Rk</sub>/γ<sub>M1</sub>) ≤ 1', h: 'W postaci przechyłowej (analiza I rzędu) C<sub>m</sub> = 0,9 (zał. B).' },
+  '6.3.4': { lab: 'PN-EN 1993-1-1, 6.3.4', t: 'Metoda ogólna', s: 'Dla elementów obciążonych w płaszczyźnie: nośność z mnożnika α<sub>ult,k</sub> (nośność przekroju z efektami w płaszczyźnie) i mnożnika krytycznego z płaszczyzny α<sub>cr,op</sub>; λ̄<sub>op</sub> = √(α<sub>ult,k</sub>/α<sub>cr,op</sub>).', f: 'χ<sub>op</sub>·α<sub>ult,k</sub>/γ<sub>M1</sub> ≥ 1', h: 'Sprawdzenie dodatkowe – nie dotyczy przy zginaniu M<sub>z</sub>.' },
+  '7.2': { lab: 'PN-EN 1990 A1.4; PN-EN 1993-1-1, 7.2', t: 'Przemieszczenia poziome', s: 'Graniczne przemieszczenia poziome uzgadnia się z inwestorem; typowe wartości w ZK: H/150 (budynki jednokondygnacyjne), h/300 na kondygnację i H/500 dla całego budynku wielokondygnacyjnego. Kombinacja charakterystyczna.', f: 'w ≤ H/lim', h: '' },
+  '6.2.5': { lab: 'PN-EN 1993-1-8, 6.2.5', t: 'Krócce teowe ściskane – docisk do betonu', s: 'Obszar docisku pod blachą: pas/środnik słupa poszerzony o c = t<sub>p</sub>√(f<sub>y</sub>/(3f<sub>jd</sub>γ<sub>M0</sub>)); wytrzymałość połączenia f<sub>jd</sub> = β<sub>j</sub>·k<sub>j</sub>·f<sub>cd</sub>.', f: 'F<sub>c,Rd</sub> = f<sub>jd</sub>·b<sub>eff</sub>·l<sub>eff</sub>', h: 'Grubsza blacha zwiększa c i obszar docisku.' },
+  '6.2.8': { lab: 'PN-EN 1993-1-8, 6.2.8', t: 'Podstawy słupów – nośność przy N + M', s: 'Nośność wyznacza się z nośności strony rozciąganej (blacha zginana + kotwy) i ściskanej (docisk pod pasem, pas słupa) z ramieniem z wg tabl. 6.7, zależnie od mimośrodu e = M/N.', f: 'M<sub>j,Rd</sub> wg tabl. 6.7', h: 'Przy niespełnieniu: większe kotwy lub wyższa klasa, grubsza blacha, większy rozstaw kotew (dłuższa blacha).' },
+  '6.2.2': { lab: 'PN-EN 1993-1-8, 6.2.2', t: 'Ścinanie podstawy', s: 'Siłę poziomą przenosi tarcie C<sub>f,d</sub>·N<sub>c,Ed</sub> i śruby kotwiące (F<sub>vb,Rd</sub>), ewentualnie ostroga.', f: 'F<sub>v,Rd</sub> = F<sub>f,Rd</sub> + n·F<sub>vb,Rd</sub>', h: 'Otwory powiększone w blasze wymagają podkładek przyspawanych, aby kotwy przenosiły ścinanie.' },
+  '4.2.3': { lab: 'PN-EN 1993-1-2, 4.2.3', t: 'Nośność w pożarze', s: 'Nośność elementów ściskanych i ściskanych ze zginaniem w temperaturze θ<sub>a</sub> z redukcją granicy plastyczności k<sub>y,θ</sub> i modułu k<sub>E,θ</sub>, krzywą wyboczeniową z α = 0,65√(235/f<sub>y</sub>).', f: 'N<sub>b,fi,t,Rd</sub> = χ<sub>fi</sub>·A·k<sub>y,θ</sub>·f<sub>y</sub>/γ<sub>M,fi</sub>', h: 'Temperatura stali – krzywa ISO 834, bez ochrony lub z ochroną ogniochronną.' },
+  '2.3': { lab: 'PN-EN 1993-1-10, 2.3', t: 'Kruche pękanie', s: 'Maksymalna grubość elementu zależy od gatunku i podgatunku stali, temperatury odniesienia T<sub>Ed</sub> i poziomu naprężeń σ<sub>Ed</sub>/f<sub>y</sub>(t) (tabl. 2.1).', f: 't ≤ t<sub>max</sub>(T<sub>Ed</sub>, σ<sub>Ed</sub>)', h: 'Przy przekroczeniu – wyższy podgatunek (J2, K2, N, NL).' }
+};
+O.find = function (ref) {
+  const r = String(ref || '');
+  if (/1993-1-8|tabl\. 3\.4|4\.5\.3/.test(r)) { if (/6\.2\.8|6\.7/.test(r)) return N['6.2.8']; if (/6\.2\.2/.test(r)) return N['6.2.2']; return N['6.2.5']; }
+  if (/6\.2\.8\.|tabl\. 6\.7/.test(r)) return N['6.2.8'];
+  if (/6\.2\.2\(/.test(r)) return N['6.2.2'];
+  if (/6\.2\.5|6\.2\.6\.1/.test(r) && /6\.2\.6\.11|6\.2\.5, 6\.2\.8/.test(r)) return N['6.2.5'];
+  if (/1993-1-2|4\.2\.3/.test(r)) return N['4.2.3'];
+  if (/1993-1-10/.test(r)) return N['2.3'];
+  if (/1990|7\.2/.test(r)) return N['7.2'];
+  if (/5\.2\.1/.test(r)) return N['5.2.1'];
+  if (/6\.3\.4/.test(r)) return N['6.3.4'];
+  if (/6\.3\.3|zał\. [AB]/.test(r)) return N['6.3.3'];
+  if (/6\.3\.2/.test(r)) return N['6.3.2'];
+  if (/6\.3\.1\.4/.test(r)) return N['6.3.1.4'];
+  if (/6\.3\.1/.test(r)) return N['6.3.1'];
+  if (/6\.2\.9/.test(r)) return N['6.2.9'];
+  if (/6\.2\.6|1993-1-5, 5/.test(r)) return N['6.2.6'];
+  if (/6\.2\.4/.test(r)) return N['6.2.4'];
+  if (/6\.2\.3/.test(r)) return N['6.2.3'];
+  if (/5\.5/.test(r)) return N['5.5'];
+  return null;
+};
+})();
