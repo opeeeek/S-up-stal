@@ -50,7 +50,14 @@ const GROUPS = [
   { id: 'sec', title: 'Przekrój i materiał', items: [
     { k: 'przekroj.typ', t: 'sel', l: 'Rodzaj przekroju', o: () => Object.keys(P.RODZAJE).map(k => [k, P.RODZAJE[k].n]), wide: true, re: true },
     { k: 'przekroj.seria', t: 'sel', l: 'Seria', o: () => serieOf(KIND()), show: () => KIND() !== 'spaw', re: true },
-    { k: 'przekroj.nr', t: 'sel', l: 'Kształtownik', o: () => P.lista(S.przekroj.seria).map(n => [n, (KIND() === 'walc' ? S.przekroj.seria + ' ' : KIND() === 'chs' ? 'CHS ' : '') + String(n).replace(/x/g, '×')]), num: () => KIND() === 'walc', show: s => KIND() !== 'spaw' && s.przekroj.seria !== 'wlasna', re: true },
+    { k: 'przekroj.nr', t: 'sel', l: 'Kształtownik', o: () => P.lista(S.przekroj.seria).map(n => [n, (KIND() === 'walc' ? S.przekroj.seria + ' ' : KIND() === 'dwuc' ? '2×' + S.przekroj.seria + ' ' : KIND() === 'chs' ? 'CHS ' : '') + String(n).replace(/x/g, '×')]), num: () => KIND() === 'walc' || KIND() === 'dwuc', show: s => KIND() !== 'spaw' && s.przekroj.seria !== 'wlasna', re: true },
+    { k: 'przekroj.uklad', t: 'sel', l: 'Układ gałęzi', o: () => Object.keys(P.UKLAD_CC).map(k => [k, P.UKLAD_CC[k]]), wide: true, show: () => KIND() === 'dwuc', re: true },
+    { k: 'przekroj.a', t: 'num', l: 'Odstęp gałęzi a (grzbiety środników; [ ] – krawędzie półek)', u: 'mm', list: [8, 10, 12, 16, 20, 40, 60, 80, 100, 120, 150, 200, 250, 300], opt: true, ph: 'auto', min: 0, show: () => KIND() === 'dwuc', re: true },
+    { k: 'przekroj.pa', t: 'num', l: 'Rozstaw osiowy przewiązek / przekładek a_{p}', u: 'mm', list: [300, 400, 500, 600, 700, 800, 1000, 1200, 1500], opt: true, ph: 'auto', min: 50, show: () => KIND() === 'dwuc', re: true },
+    { k: 'przekroj.pb', t: 'num', l: 'Przewiązka – szerokość b_{b} (wzdłuż słupa)', u: 'mm', list: [100, 120, 150, 180, 200, 250, 300], opt: true, ph: 'auto', min: 20, show: s => KIND() === 'dwuc' && s.przekroj.uklad !== 'plecy', re: true },
+    { k: 'przekroj.pt', t: 'num', l: 'Przewiązka – grubość t_{b}', u: 'mm', list: [6, 8, 10, 12, 15, 20], opt: true, ph: 'auto', min: 3, show: s => KIND() === 'dwuc' && s.przekroj.uklad !== 'plecy', re: true },
+    { k: 'przekroj.pc', t: 'num', l: 'Przewiązka – zakład na gałąź c', u: 'mm', list: [30, 40, 50, 60, 70, 80], opt: true, ph: 'auto', min: 10, show: s => KIND() === 'dwuc' && s.przekroj.uklad !== 'plecy', re: true },
+    { k: 'przekroj.pw', t: 'num', l: 'Spoiny przewiązek a_{w}', u: 'mm', list: [3, 4, 5, 6, 7, 8], opt: true, ph: 'auto', min: 2, show: s => KIND() === 'dwuc' && s.przekroj.uklad !== 'plecy', re: true },
     { k: 'przekroj.wyk', t: 'sel', l: 'Wykonanie rury', o: [['gor', 'gorąco wykończona (PN-EN 10210)'], ['zimn', 'formowana na zimno (PN-EN 10219)']], wide: true, show: () => KIND() === 'rura' || KIND() === 'chs' },
     { k: 'przekroj.h', t: 'num', l: 'Wysokość h', u: 'mm', list: () => KIND() === 'rura' ? [100, 120, 150, 160, 200, 250, 300, 350, 400] : [200, 250, 300, 350, 400, 450, 500, 600, 700, 800], min: 20, show: s => KIND() === 'spaw' || (KIND() === 'rura' && s.przekroj.seria === 'wlasna'), re: true },
     { k: 'przekroj.b', t: 'num', l: 'Szerokość b', u: 'mm', list: [100, 120, 150, 200, 250, 300], min: 20, show: s => KIND() === 'rura' && s.przekroj.seria === 'wlasna', re: true },
@@ -68,8 +75,8 @@ const GROUPS = [
     { t: 'hint', h: () => secHint() },
     { t: 'html', h: () => `<div class="row wide"><span></span><span><button class="btn sm" data-act="secwin" type="button">Przekrój…</button> <button class="btn sm" data-act="sectab" type="button">Tablica kształtowników…</button></span></div>` }
   ] },
-  { id: 'load', title: 'Obciążenia i kombinacje', items: [
-    { t: 'html', h: () => loadListHTML() },
+  { id: 'load', title: 'Kombinacje obciążeń i ciężar własny', items: [
+    { t: 'html', h: () => `<div class="hint">Obciążenia zadajesz na schemacie: przycisk <b>„Obciążenia”</b> nad schematem, prawy przycisk na słupie („Dodaj obciążenie na x = …”) lub dwuklik na słupie. Zestawienie obciążeń – pod schematem.</div>` },
     { k: 'ciezarWlasny.auto', t: 'chk', l: 'Ciężar własny słupa (78,5 kN/m³)', re: true },
     { k: 'ciezarWlasny.dodatek', t: 'num', l: 'Dodatek na blachy, łączniki', u: '%', list: [0, 5, 10, 15, 20], min: 0, show: s => s.ciezarWlasny.auto },
     { t: 'sub', l: 'Kombinacje (PN-EN 1990)' },
@@ -150,24 +157,14 @@ A.GROUPS = GROUPS;
 function secHint() {
   if (!R || !R.sec) return '';
   const s = R.sec, b = R.base;
-  return `${esc(s.nazwa)}: A = ${fmt(s.A / 100, 2)} cm², I<sub>y</sub> = ${fmt(s.Iy / 1e4, 0)} cm⁴, I<sub>z</sub> = ${fmt(s.Iz / 1e4, 0)} cm⁴, i<sub>y</sub>/i<sub>z</sub> = ${fmt(s.iy / 10, 2)}/${fmt(s.iz / 10, 2)} cm, ${fmt(s.masa, 1)} kg/m · f<sub>y</sub> = ${fmt(R.mat.fy, 0)} MPa · klasa N/M<sub>y</sub>/M<sub>z</sub>: ${b.kN.cls}/${b.kMy.cls}/${b.kMz.cls} · N<sub>c,Rd</sub> = ${fmt(b.Nc / 1e3, 0)} kN, M<sub>c,y,Rd</sub> = ${fmt(b.Mcy / 1e6, 1)} kNm`;
+  const cc = s.kind === 'CC' ? `<br>Słup złożony: B = ${fmt(s.B, 0)} mm, h<sub>0</sub> = ${fmt(s.h0, 1)} mm${s.aAuto ? ' (rozstaw auto: I<sub>z,eff</sub> ≈ 1,1·I<sub>y</sub>)' : ''}; gałąź ${esc(s.ch.nazwa)}: A<sub>ch</sub> = ${fmt(s.A_ch / 100, 2)} cm², I<sub>ch</sub> = ${fmt(s.I_ch / 1e4, 1)} cm⁴, i<sub>min</sub> = ${fmt(s.i_ch / 10, 2)} cm; ${s.bu && !s.buPack ? `przewiązki ${fmt(s.pb, 0)}×${fmt(s.pt, 0)} mm co ${fmt(s.pa, 0)} mm${s.paAuto ? ' (auto: λ<sub>ch</sub> ≈ 40)' : ''}` : `przekładki co ${fmt(s.pa, 0)} mm (15·i<sub>min</sub> = ${fmt(s.lim15, 0)} mm)`}.` : '';
+  return cc + `${esc(s.nazwa)}: A = ${fmt(s.A / 100, 2)} cm², I<sub>y</sub> = ${fmt(s.Iy / 1e4, 0)} cm⁴, I<sub>z</sub> = ${fmt(s.Iz / 1e4, 0)} cm⁴, i<sub>y</sub>/i<sub>z</sub> = ${fmt(s.iy / 10, 2)}/${fmt(s.iz / 10, 2)} cm, ${fmt(s.masa, 1)} kg/m · f<sub>y</sub> = ${fmt(R.mat.fy, 0)} MPa · klasa N/M<sub>y</sub>/M<sub>z</sub>: ${b.kN.cls}/${b.kMy.cls}/${b.kMz.cls} · N<sub>c,Rd</sub> = ${fmt(b.Nc / 1e3, 0)} kN, M<sub>c,y,Rd</sub> = ${fmt(b.Mcy / 1e6, 1)} kNm`;
 }
 function stabHint() {
   if (!R || !R.res || !R.res.length) return '';
   const g = BS.Raport.govMember(R); if (!g) return '';
   const m = g.mem, fy = m.flex.y, fz = m.flex.z;
   return `Kombinacja decydująca (${esc(g.combo.id)}): L<sub>cr,y</sub> = ${isFinite(fy.Lcr) ? fmt(fy.Lcr / 1000, 2) + ' m' : '—'} (λ̄<sub>y</sub> = ${fmt(fy.lam, 2)}, χ<sub>y</sub> = ${fmt(fy.chi, 3)}), L<sub>cr,z</sub> = ${isFinite(fz.Lcr) ? fmt(fz.Lcr / 1000, 2) + ' m' : '—'} (λ̄<sub>z</sub> = ${fmt(fz.lam, 2)}, χ<sub>z</sub> = ${fmt(fz.chi, 3)})${m.segs[0] && isFinite(m.segs[0].Mcr) ? ` · M<sub>cr</sub> = ${fmt(m.segs[0].Mcr / 1e6, 0)} kNm, χ<sub>LT</sub> = ${fmt(m.segs[0].chiLT, 3)}` : ''}. Szczegóły – zakładka <b>Stateczność</b>.`;
-}
-function loadListHTML() {
-  const L = S.obciazenia || [];
-  let h = '<div class="ldlist">';
-  L.forEach((o, i) => {
-    const col = D.loadColor(o);
-    const sk = (o.sklad || []).map(p => p.typ === 'N' ? `N ${fmt(U.num(p.F), 1)} kN${U.num(p.ez) || U.num(p.ey) ? ` (e ${fmt(U.num(p.ez), 0)}/${fmt(U.num(p.ey), 0)})` : ''}` : p.typ === 'H' ? `H<sub>${p.kier}</sub> ${fmt(U.num(p.F), 1)} kN` : p.typ === 'q' ? `q<sub>${p.kier}</sub> ${fmt(U.num(p.q0), 2)} kN/m` : `M<sub>${p.os}</sub> ${fmt(U.num(p.M), 1)} kNm`).join(', ');
-    h += `<div class="lrow" style="border-left:3px solid ${col};padding-left:6px"><input type="checkbox" data-lon="${i}" ${o.aktywne !== false ? 'checked' : ''} title="uwzględnij w obliczeniach"><b style="color:${col};min-width:30px">${esc(o.id)}</b><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(o.nazwa)}">${esc(o.nazwa)} <small>– ${sk}</small></span><button class="btn sm" data-ledit="${i}" type="button">Zmień…</button></div>`;
-  });
-  h += `<div class="lrow"><button class="btn sm pri" data-act="addload" type="button">+ Obciążenie…</button></div></div>`;
-  return h;
 }
 function baseSummaryHTML() {
   const o = S.podstawa, k = o.kotwy || {};
@@ -227,8 +224,10 @@ function onSet(k, v) {
     if (v === 'walc') Object.assign(d, { seria: 'HEB', nr: 240 });
     else if (v === 'rura') Object.assign(d, { seria: 'SHS', nr: '200x10', wyk: d.wyk || 'gor', h: d.h || 200, b: d.b || 200, t: d.t || 10 });
     else if (v === 'chs') Object.assign(d, { seria: 'CHS', nr: '219.1x8', wyk: d.wyk || 'gor', D: d.D || 219.1, t: d.t || 8 });
+    else if (v === 'dwuc') Object.assign(d, { seria: 'UPN', nr: 240, uklad: d.uklad && P.UKLAD_CC[d.uklad] ? d.uklad : 'zew', a: '', pa: '', pb: '', pt: '', pc: '', pw: '' });
     else if (v === 'spaw') Object.assign(d, { h: U.num(d.h) > 150 ? d.h : 400, bg: d.bg || 300, tg: d.tg || 16, bd: d.bd || d.bg || 300, td: d.td || 16, tw: d.tw || 10, aw: d.aw || 5 });
   }
+  if (k === 'przekroj.uklad') S.przekroj.a = '';
   if (k === 'przekroj.seria') { const L = P.lista(v); if (L.length && !L.map(String).includes(String(S.przekroj.nr))) S.przekroj.nr = L[Math.floor(L.length / 2)]; }
   if (k === 'material.gatunek') { const pods = (M.STAL[v] || { pod: ['JR'] }).pod; if (!pods.includes(S.material.podgatunek)) S.material.podgatunek = pods[pods.length - 1]; }
   if (k === 'podstawa.typ') { S.podstawa.kotwy.uklad = v === 'sztywna' ? 'zew' : 'wew'; }
@@ -392,6 +391,9 @@ function colTabsHTML() {
   if (!COLS || COLS.length < 2) return `<div class="schtools" style="display:flex;gap:6px;align-items:center"><button class="btab on" data-btab="0" type="button"><span>1 ${esc((S.meta.nazwa || '').slice(0, 14))}</span></button><button class="btn sm" data-badd="1" type="button" title="Dodaj słup do projektu">+</button></div>`;
   return `<div class="schtools" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${COLS.map((b, i) => `<button class="btab ${i === curC ? 'on' : ''}" data-btab="${i}" type="button"><span>${i + 1} ${esc((b.meta.nazwa || '').slice(0, 14))}</span>${COLS.length > 1 ? `<i data-bdel="${i}" title="Usuń słup">×</i>` : ''}</button>`).join('')}<button class="btn sm" data-badd="1" type="button">+</button></div>`;
 }
+let schSel = null;   // zaznaczony element schematu: { t: 'col' } | { t: 'ld', i } | { t: 'sup', pl, end } | { t: 'br', i }
+let schPin = null;   // znacznik wartości na wykresie schematu [mm]
+let showDims = (() => { try { return localStorage.getItem('ss.dims') !== '0'; } catch (e) { return true; } })();
 function renderDataSide() {
   const el = $('#dataside'); if (!el) return;
   const W = Math.max(250, Math.min(360, (el.clientWidth || 640) / 2 - 22));
@@ -399,29 +401,33 @@ function renderDataSide() {
   const gv = ok ? BS.Raport.govMember(R) : null;
   const secName = R && R.sec ? `${R.sec.nazwa} · ${S.material.gatunek}${S.material.podgatunek}` : '';
   if (!ok || (schCombo !== null && !R.res[schCombo])) schCombo = null;
+  if (schSel && !selValid(schSel)) schSel = null;
   const sf = schF();
   const DG = [['M', 'M', 'Momenty zginające M_Ed'], ['V', 'V', 'Siły poprzeczne V_Ed'], ['N', 'N', 'Siła podłużna N_Ed'], ['w', 'przemieszczenie', 'Przemieszczenia poziome (SGU)'], ['buck', 'wyboczenie', 'Postać wyboczenia i L_cr'], ['none', 'bez wykresu', 'Tylko schemat i obciążenia']];
+  const tools = `<span class="schtools">${[['loads', 'Obciążenia', 'Okno obciążeń słupa: lista, dodawanie, zmiana, usuwanie'], ['sec', 'Przekrój', 'Przekrój i materiał słupa'], ['brace', 'Stężenia', 'Stężenia boczne i skrętne na wysokości słupa'], ['dims', 'Wymiary', 'Pokaż / ukryj łańcuch wymiarowy (stężenia, miejsca obciążeń)']].map(([k, l, t]) => `<button type="button" class="btn sm${k === 'dims' && showDims ? ' on' : ''}" data-tool="${k}" title="${t}"${k === 'dims' ? ` aria-pressed="${showDims}"` : ''}>${l}</button>`).join('')}</span>`;
   let h = colTabsHTML();
-  h += `<div class="box"><div class="schhead"><h4>Schemat statyczny i obciążenia</h4><div class="schtools"><button class="btn sm" data-act="addload" type="button" title="Nowe obciążenie (wiele składników: N, H, q, M)">+ Obciążenie</button><button class="btn sm" data-stool="sup" type="button" title="Warunki podparcia w obu płaszczyznach">Podparcie</button><button class="btn sm" data-act="braces" type="button" title="Stężenia boczne i skrętne na wysokości słupa">Stężenia</button><button class="btn sm" data-act="secwin" type="button" title="Przekrój: rodzaj, kształtownik, wymiary, dobór">Przekrój</button><button class="btn sm" data-act="basewin" type="button" title="Projektant podstawy słupa">Podstawa</button><button class="btn sm" data-stool="schemes" type="button" title="Typowe schematy podparcia słupa">Schematy typowe…</button><button class="btn sm" data-stool="v3d" type="button" title="Widok przestrzenny słupa z podstawą, obciążeniami i postaciami wyboczenia (zakładka „Słup i podstawa”)">Widok 3D</button></div></div>`;
-  h += `<div class="schsel"><span class="mut">Kliknij obciążenie – zmiana; podporę – warunki podparcia; stężenie – edycja; słup – przekrój; dwuklik na słupie – obciążenie na tej wysokości; wykres – siły i sprawdzenia na tej wysokości; prawy przycisk – menu.</span></div>`;
-  h += legendHTML();
-  h += `<div class="schpair" id="schPair">${['y', 'z'].map(pl => `<div class="schemewrap">${D.scheme(S, R, pl, { W, H: 470, diag: diagMode, gov: gv, secName, loadsOn: null, F: sf ? sf.F : null, Flab: sf ? sf.lab : '' })}</div>`).join('')}</div>`;
+  h += `<div class="box"><div class="schhead"><h4>Schemat statyczny i obciążenia</h4>${tools}</div>`;
+  h += `<div class="schsel" id="schSelBar">${selBarHTML()}</div>`;
+  h += `<div class="schpair" id="schPair">${['y', 'z'].map(pl => `<div class="schemewrap">${D.scheme(S, R, pl, { W, H: 470, diag: diagMode, gov: gv, secName, loadsOn: null, F: sf ? sf.F : null, Flab: sf ? sf.lab : '', dims: showDims })}</div>`).join('')}</div>`;
   const comboSel = ok ? `<select id="schCombo" class="cmbsel" title="Kombinacja pokazana na wykresach schematu"><option value="">obwiednia SGN (wszystkie kombinacje)</option>${R.res.map((cr, i) => `<option value="${i}" ${schCombo === i ? 'selected' : ''}>${esc(cr.combo.id)} – ${esc((cr.combo.opis || '').slice(0, 70))}</option>`).join('')}</select>` : '';
   h += `<div class="schunder"><div class="segsw sm">${DG.map(([k, l, t]) => `<button class="${diagMode === k ? 'on' : ''}" data-diag="${k}" type="button" title="${esc(t)}">${l}</button>`).join('')}</div>${comboSel}</div>`;
   if (sf) h += `<div class="combsum"><b>${esc(sf.cr.combo.id)}</b>: ${esc(sf.cr.combo.opis || '')}${sf.cr.variants.length > 1 ? ` <small>· wariant ${esc(sf.v.lab)}</small>` : ''} · N<sub>Ed,max</sub> = ${fmt(maxA(sf.F.N) / 1e3, 1)} kN, |M<sub>y,Ed</sub>|<sub>max</sub> = ${fmt(maxA(sf.F.y.M) / 1e6, 1)} kNm, |M<sub>z,Ed</sub>|<sub>max</sub> = ${fmt(maxA(sf.F.z.M) / 1e6, 1)} kNm, η = <b>${fmt(uOf(sf.v) * 100, 0)}%</b> <button class="lnk" id="schEnv" type="button">obwiednia</button></div>`;
+  h += `<div class="hint">${exDetails('<b>Lewy przycisk</b> – zaznacz element (słup, obciążenie, podporę, stężenie); kolejne kliknięcie – odznacz, Esc – odznacz. <b>Prawy przycisk</b> – menu zaznaczonego elementu (zmiana, duplikowanie, wyłączenie, usuwanie, dodanie obciążenia lub stężenia w tym miejscu). <b>Dwuklik</b> – od razu okno zmiany (na słupie – nowe obciążenie na tej wysokości). Klik na wykresie – znacznik z wartościami na tej wysokości (w obu płaszczyznach); dwuklik – siły i sprawdzenia w tym miejscu. Każda podpora (podstawa, wierzchołek) w każdej płaszczyźnie – osobno.', 'Jak obsługiwać schemat?')}</div>`;
   if (R && R.errors && R.errors.length) h += R.errors.map(e => `<div class="msg err" style="margin-top:6px">${esc(e)}</div>`).join('');
-  h += '</div>';
   h += loadTableHTML();
+  h += '</div>';
   if (ok) h += combosBoxHTML();
-  // podsumowanie sił na fundament
+  // siły na fundament
   if (R && R.baseForces && R.baseForces.length) {
     const bf = R.baseForces, mx = (fn) => bf.reduce((a, q) => (Math.abs(fn(q)) > Math.abs(fn(a)) ? q : a));
     const qN = bf.reduce((a, q) => (q.N > a.N ? q : a)), qM = mx(q => q.My), qMz = mx(q => q.Mz), qV = bf.reduce((a, q) => (Math.hypot(q.Vy, q.Vz) > Math.hypot(a.Vy, a.Vz) ? q : a));
     const row = (l, q) => `<tr data-selcid="${esc(q.combo.id)}" title="Pokaż tę kombinację na schemacie"><td>${l}</td><td class="n">${fmt(q.N / 1e3, 1)}</td><td class="n">${fmt(q.My / 1e6, 1)}</td><td class="n">${fmt(q.Mz / 1e6, 1)}</td><td class="n">${fmt(Math.hypot(q.Vy, q.Vz) / 1e3, 1)}</td><td><small>${esc(q.combo.id)}</small></td></tr>`;
-    h += `<div class="box"><div class="schhead"><h4>Siły na fundament (obliczeniowe)</h4><button class="btn sm" data-act="basewin" type="button">Podstawa…</button></div><div class="tscroll"><table class="ldsum"><thead><tr><th></th><th>N [kN]</th><th>M<sub>y</sub> [kNm]</th><th>M<sub>z</sub> [kNm]</th><th>V [kN]</th><th>komb.</th></tr></thead><tbody>${row('max N', qN)}${row('max |M<sub>y</sub>|', qM)}${row('max |M<sub>z</sub>|', qMz)}${row('max V', qV)}</tbody></table></div></div>`;
+    h += `<div class="box"><div class="schhead"><h4>Siły na fundament (obliczeniowe)</h4></div><div class="tscroll"><table class="ldsum"><thead><tr><th></th><th>N [kN]</th><th>M<sub>y</sub> [kNm]</th><th>M<sub>z</sub> [kNm]</th><th>V [kN]</th><th>komb.</th></tr></thead><tbody>${row('max N', qN)}${row('max |M<sub>y</sub>|', qM)}${row('max |M<sub>z</sub>|', qMz)}${row('max V', qV)}</tbody></table></div></div>`;
   }
   el.innerHTML = h;
   bindSide(el);
+  applySel(el);
+  drawPin(el);
   Q.zoomApply(el);
 }
 A.renderDataSide = renderDataSide;
@@ -437,71 +443,162 @@ function schF() {
 A.schF = schF;
 A.setSchCombo = (i) => { schCombo = i; renderDataSide(); };
 const skladTxt = (o) => (o.sklad || []).map(p => p.typ === 'N' ? `N ${fmt(U.num(p.F), 1)} kN${p.x !== '' && p.x !== undefined ? ` @ ${fmt(U.num(p.x), 2)} m` : ''}${U.num(p.ez) || U.num(p.ey) ? ` (e<sub>z</sub> ${fmt(U.num(p.ez), 0)}, e<sub>y</sub> ${fmt(U.num(p.ey), 0)} mm)` : ''}` : p.typ === 'H' ? `H<sub>${p.kier}</sub> ${fmt(U.num(p.F), 1)} kN${p.x !== '' && p.x !== undefined ? ` @ ${fmt(U.num(p.x), 2)} m` : ''}` : p.typ === 'q' ? `q<sub>${p.kier}</sub> ${fmt(U.num(p.q0), 2)}${p.q1 !== '' && p.q1 !== undefined ? '…' + fmt(U.num(p.q1), 2) : ''} kN/m` : `M<sub>${p.os}</sub> ${fmt(U.num(p.M), 1)} kNm${p.x !== '' && p.x !== undefined ? ` @ ${fmt(U.num(p.x), 2)} m` : ''}`).join('; ');
-function legendHTML() {
-  const L = S.obciazenia || [];
-  if (!L.length) return '';
-  return `<div class="legend">${L.map((o, i) => `<span class="lgi ${o.aktywne === false ? 'off' : ''}" title="${esc(o.nazwa || '')}"><input type="checkbox" data-lgon="${i}" ${o.aktywne !== false ? 'checked' : ''} title="uwzględnij w obliczeniach"><i style="background:${D.loadColor(o)}"></i><button class="lnk" data-lgopen="${i}" type="button">${esc(o.id)}</button></span>`).join('')}<span class="hint" style="margin:0">wartości charakterystyczne</span></div>`;
-}
+A.skladTxt = skladTxt;
+// zestawienie obciążeń pod schematem (jak w BelkaŻB) – jedyne miejsce listy obciążeń na ekranie Dane
 function loadTableHTML() {
   const L = S.obciazenia || [];
   const rows = L.map((o, i) => {
     const R0 = S0.RODZAJE[o.rodzaj] || { n: o.rodzaj }, psi = BS.K && BS.K.psi ? BS.K.psi(o) : null;
-    return `<tr data-openload="${i}" class="${o.aktywne === false ? 'ldoff' : ''}"><td><input type="checkbox" class="ldon" data-loff="${i}" ${o.aktywne !== false ? 'checked' : ''} title="uwzględnij w obliczeniach"></td><td><b style="color:${D.loadColor(o)}">${esc(o.id)}</b></td><td>${esc(o.nazwa || '(bez nazwy)')}<small> · ${esc(R0.n)}${o.rodzaj === 'Q' && N.PSI[o.kat] ? ' ' + esc(o.kat) : ''}${o.wyklucz ? ` · grupa ${esc(o.wyklucz)}` : ''}</small></td><td class="hs">${skladTxt(o)}</td><td class="n">${psi && !R0.stale && o.rodzaj !== 'A' ? psi.map(v => fmt(v, 1)).join(' / ') : '—'}</td></tr>`;
+    return `<tr data-openload="${i}" class="${o.aktywne === false ? 'ldoff' : ''}" title="Kliknij – zaznacz na schemacie; dwuklik – zmień; prawy przycisk – menu"><td style="white-space:nowrap"><input type="checkbox" class="ldon" data-loff="${i}" ${o.aktywne !== false ? 'checked' : ''} title="uwzględnij w obliczeniach"><i class="lsw" style="background:${D.loadColor(o)}"></i></td><td><b style="color:${D.loadColor(o)}">${esc(o.id)}</b></td><td>${esc(o.nazwa || '(bez nazwy)')}<small> · ${esc(R0.n)}${o.rodzaj === 'Q' && N.PSI[o.kat] ? ' ' + esc(o.kat) : ''}${o.wyklucz ? ` · grupa ${esc(o.wyklucz)}` : ''}</small></td><td class="hs">${skladTxt(o)}</td><td class="n">${psi && !R0.stale && o.rodzaj !== 'A' ? psi.map(v => fmt(v, 1)).join(' / ') : '—'}</td></tr>`;
   }).join('');
-  return `<div class="box"><div class="schhead"><h4>Zestawienie obciążeń (wartości charakterystyczne)</h4><span class="hint" style="margin:0">${L.filter(o => o.aktywne !== false).length} z ${L.length} uwzględnionych</span></div>
-    <div class="tscroll"><table class="ldsum"><thead><tr><th></th><th></th><th>Nazwa · rodzaj</th><th>Składniki</th><th>ψ₀ / ψ₁ / ψ₂</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="lnone">Brak obciążeń – dodaj je przyciskami poniżej.</td></tr>'}</tbody></table></div>
-    <div class="addbar">${[['G', '+ stałe'], ['Q', '+ użytkowe'], ['S', '+ śnieg'], ['W', '+ wiatr'], ['T', '+ inne zmienne']].map(([k, l]) => `<button class="btn sm" data-addl="${k}" type="button">${l}</button>`).join('')}</div>
-    <p class="hint">Kliknij wiersz – edycja składników; prawy przycisk – menu (duplikuj, wyłącz, usuń). Ciężar własny słupa dodawany automatycznie jako obciążenie stałe. Kombinacje tworzone automatycznie wg PN-EN 1990 (grupy wykluczające się – np. kierunki wiatru).</p></div>`;
+  const sw = S.ciezarWlasny && S.ciezarWlasny.auto && R && R.sec ? `<tr class="info"><td></td><td>G₀</td><td>ciężar własny słupa<small> · stałe (G), automatycznie</small></td><td class="hs">${fmt(R.sec.gk * (1 + U.num((S.ciezarWlasny || {}).dodatek, 0) / 100), 2)} kN/m · razem ${fmt(R.sec.gk * (1 + U.num((S.ciezarWlasny || {}).dodatek, 0) / 100) * U.num(S.geom.H), 1)} kN</td><td class="n">—</td></tr>` : '';
+  return `<h4 class="lsec">Zestawienie obciążeń <small class="hint" style="font-weight:400">(wartości charakterystyczne · ${L.filter(o => o.aktywne !== false).length} z ${L.length} uwzględnionych)</small></h4>
+    <div class="tscroll"><table class="ldsum"><thead><tr><th></th><th></th><th>Nazwa · rodzaj</th><th>Składniki</th><th>ψ₀ / ψ₁ / ψ₂</th></tr></thead><tbody>${sw}${rows || '<tr><td colspan="5" class="lnone">Brak obciążeń – przycisk „Obciążenia” nad schematem albo prawy przycisk na słupie.</td></tr>'}</tbody></table></div>`;
 }
 function combosBoxHTML() {
   const res = R.res || []; if (!res.length) return '';
   const rk = res.map((cr, i) => { const v = cr.variants.reduce((a, q) => (uOf(q) > uOf(a) ? q : a), cr.variants[0]); return { i, cr, v, u: uOf(v) }; }).sort((a, b) => b.u - a.u).slice(0, 6);
   return `<div class="box"><div class="schhead"><h4>Kombinacje decydujące</h4><span class="hint" style="margin:0">${res.length} kombinacji SGN · ${esc(R.method === 'I' ? 'analiza I rzędu' : 'analiza II rzędu')}</span></div><div class="tscroll"><table class="ldsum"><thead><tr><th>Kombinacja</th><th>N<sub>Ed,max</sub> [kN]</th><th>|M<sub>y</sub>|<sub>max</sub> [kNm]</th><th>|M<sub>z</sub>|<sub>max</sub> [kNm]</th><th>η<sub>elem.</sub></th></tr></thead><tbody>${rk.map(q => `<tr data-selc="${q.i}" class="${schCombo === q.i ? 'sel' : ''}" style="cursor:pointer" title="Pokaż na schemacie"><td><b>${esc(q.cr.combo.id)}</b> <small>${esc((q.cr.combo.opis || '').slice(0, 60))}</small></td><td class="n">${q.v.F && q.v.F.N ? fmt(maxA(q.v.F.N) / 1e3, 1) : '—'}</td><td class="n">${q.v.F && q.v.F.y ? fmt(maxA(q.v.F.y.M) / 1e6, 1) : '—'}</td><td class="n">${q.v.F && q.v.F.z ? fmt(maxA(q.v.F.z.M) / 1e6, 1) : '—'}</td><td class="n"><b style="color:var(--${q.u > 1 ? 'fail' : 'ok'})">${fmt(q.u * 100, 0)}%</b></td></tr>`).join('')}</tbody></table></div><p class="hint">Kliknij wiersz – wykresy schematu dla tej kombinacji (wariant imperfekcji decydujący).</p></div>`;
 }
-function loadMenu(i, x, y) {
-  const L = S.obciazenia[i]; if (!L) return;
-  Q.ctxMenu(x, y, [['edit', `Zmień ${esc(L.id)}…`], ['dup', 'Duplikuj'], ['onoff', L.aktywne === false ? 'Włącz (uwzględnij w obliczeniach)' : 'Wyłącz (pomiń w obliczeniach)'], ['-'], ['del', 'Usuń…']], async a => {
-    if (a === 'edit') A.loadPopup(i);
-    else if (a === 'dup') { const c = U.clone(L), used = new Set(S.obciazenia.map(o => o.id)); const r = (L.id.match(/^[A-Za-z]+/) || ['Q'])[0]; let k = 1; while (used.has(r + k)) k++; c.id = r + k; c.nazwa = (L.nazwa || '') + ' (kopia)'; S.obciazenia.splice(i + 1, 0, c); changed(true); }
+/* ---------------- zaznaczanie (lewy przycisk), menu (prawy), okno (dwuklik) – jak w BelkaŻB */
+const SUPN = { dol: { utw: 'utwierdzenie', prz: 'przegub', spr: 'sprężyna obrotowa' }, gora: { swob: 'swobodny', prz: 'przegub nieprzesuwny', utw: 'utwierdzenie nieprzesuwne', utwp: 'utwierdzenie przesuwne', spr: 'podparcie sprężyste' } };
+const PLN = (pl) => (pl === 'y' ? 'płaszczyzna x–z (M<sub>y</sub>)' : 'płaszczyzna x–y (M<sub>z</sub>)');
+function selValid(q) { return q.t === 'col' || (q.t === 'ld' && S.obciazenia[q.i]) || (q.t === 'br' && S.stezenia[q.i]) || q.t === 'sup'; }
+const sameSel = (a, b) => !!a && !!b && a.t === b.t && a.i === b.i && a.pl === b.pl && a.end === b.end;
+function selBarHTML() {
+  const q = schSel, L = (k, l) => `<button class="lnk" data-sa="${k}" type="button">${l}</button>`;
+  if (!q) return '<span class="mut">Lewy przycisk – zaznacz słup, obciążenie, podporę lub stężenie; prawy – menu; dwuklik – zmiana.</span>';
+  const clr = ` · ${L('none', 'odznacz (Esc)')}`;
+  if (q.t === 'col') return `Zaznaczony: <b>słup ${esc(R && R.sec ? R.sec.nazwa : '')}</b>, H = ${fmt(U.num(S.geom.H), 2)} m · ${L('loads', 'obciążenia…')} · ${L('sec', 'przekrój…')} · ${L('brace', 'stężenia…')}${clr}`;
+  if (q.t === 'ld') { const o = S.obciazenia[q.i]; return `Zaznaczone: <b style="color:${D.loadColor(o)}">${esc(o.id)}</b> <b>${esc(o.nazwa || '')}</b> <small>(${esc((S0.RODZAJE[o.rodzaj] || { n: o.rodzaj }).n)}; ${skladTxt(o)})</small> · ${L('edit', 'zmień…')} · ${L('dup', 'duplikuj')} · ${L('onoff', o.aktywne === false ? 'włącz' : 'wyłącz')} · ${L('del', 'usuń…')}${clr}`; }
+  if (q.t === 'sup') { const v = S.podpory[q.end][q.pl]; return `Zaznaczona: <b>${q.end === 'dol' ? 'podstawa' : 'wierzchołek'}</b> – ${PLN(q.pl)}: <b>${esc(SUPN[q.end][v] || v)}</b> · ${L('edit', 'zmień…')}${clr}`; }
+  if (q.t === 'br') { const z = S.stezenia[q.i]; return `Zaznaczone: <b>stężenie S${q.i + 1}</b>, x = ${fmt(U.num(z.x), 2)} m (${z.pl === 'yz' ? 'oba kierunki' : z.pl === 'y' ? 'kierunek z' : 'kierunek y'}${z.skret ? ', skrętne' : ''}) · ${L('edit', 'zmień…')} · ${L('del', 'usuń')}${clr}`; }
+  return '';
+}
+// podświetlenie zaznaczenia bez przebudowy rysunku (dwuklik działa na tym samym elemencie)
+function applySel(el) {
+  el = el || $('#dataside'); if (!el) return;
+  $$('.schemesvg .sel, .ldsum tr.lsel', el).forEach(x => x.classList.remove('sel', 'lsel'));
+  const q = schSel;
+  if (q) {
+    if (q.t === 'col') $$('.schcol', el).forEach(g => g.classList.add('sel'));
+    else if (q.t === 'ld') { $$(`.ld[data-li="${q.i}"]`, el).forEach(g => g.classList.add('sel')); $$(`tr[data-openload="${q.i}"]`, el).forEach(tr => tr.classList.add('lsel')); }
+    else if (q.t === 'sup') $$(`.supp[data-sup="${q.pl}"][data-end="${q.end}"]`, el).forEach(g => g.classList.add('sel'));
+    else if (q.t === 'br') $$(`.brace[data-brace="${q.i}"]`, el).forEach(g => g.classList.add('sel'));
+  }
+  const bar = $('#schSelBar', el); if (bar) { bar.innerHTML = selBarHTML(); $$('[data-sa]', bar).forEach(b => b.addEventListener('click', () => selAct(b.dataset.sa))); }
+}
+function setSel(q, toggle) { schSel = toggle && sameSel(schSel, q) ? null : q; applySel(); }
+A.clearSel = () => { if (!schSel) return false; schSel = null; applySel(); return true; };
+function openSel(q) {
+  if (!q) return;
+  if (q.t === 'col') A.secPopup();
+  else if (q.t === 'ld') A.loadPopup(q.i);
+  else if (q.t === 'sup') A.supportPopup(q.pl, q.end);
+  else if (q.t === 'br') A.bracesPopup(q.i);
+}
+async function selAct(a, q) {
+  q = q || schSel;
+  if (a === 'none') { schSel = null; applySel(); return; }
+  if (a === 'loads') return A.loadsWin();
+  if (a === 'sec') return A.secPopup();
+  if (a === 'brace') return A.bracesPopup();
+  if (!q) return;
+  if (a === 'edit') return openSel(q);
+  if (q.t === 'ld') {
+    const L = S.obciazenia[q.i]; if (!L) return;
+    if (a === 'dup') { const c = U.clone(L), used = new Set(S.obciazenia.map(o => o.id)); const r = (L.id.match(/^[A-Za-z]+/) || ['Q'])[0]; let k = 1; while (used.has(r + k)) k++; c.id = r + k; c.nazwa = (L.nazwa || '') + ' (kopia)'; S.obciazenia.splice(q.i + 1, 0, c); schSel = { t: 'ld', i: q.i + 1 }; changed(true); }
     else if (a === 'onoff') { L.aktywne = L.aktywne === false; changed(true); }
-    else if (a === 'del') { if (await Q.ask(`Usunąć obciążenie ${esc(L.id)}?`, 'Usuń', true)) { S.obciazenia.splice(i, 1); changed(true); } }
+    else if (a === 'del') { if (await Q.ask(`Usunąć obciążenie ${esc(L.id)}?`, 'Usuń', true)) { S.obciazenia.splice(q.i, 1); schSel = null; changed(true); } }
+  } else if (q.t === 'br' && a === 'del') { S.stezenia.splice(q.i, 1); schSel = null; changed(true); }
+}
+// menu prawego przycisku – zależne od zaznaczonego elementu
+function schMenu(ev, svg) {
+  const x = svg ? xOfEv(svg, ev) : null, pl = svg ? svg.dataset.pl : 'y', q = schSel;
+  const it = [];
+  if (q && q.t === 'ld') { const L = S.obciazenia[q.i]; it.push(['edit', `Zmień ${esc(L.id)}…`], ['dup', 'Duplikuj'], ['onoff', L.aktywne === false ? 'Włącz (uwzględnij w obliczeniach)' : 'Wyłącz (pomiń w obliczeniach)'], ['del', 'Usuń…'], ['-']); }
+  else if (q && q.t === 'sup') it.push(['edit', `${q.end === 'dol' ? 'Podstawa' : 'Wierzchołek'} – warunki podparcia…`], ['schemes', 'Schematy typowe…'], ['-']);
+  else if (q && q.t === 'br') it.push(['edit', `Zmień stężenie S${q.i + 1}…`], ['del', 'Usuń stężenie'], ['-']);
+  if (x !== null) it.push(['at', `Siły i sprawdzenia na x = ${fmt(x / 1000, 2)} m…`], ['addl', `Dodaj obciążenie na x = ${fmt(x / 1000, 2)} m…`], ['addb', `Dodaj stężenie na x = ${fmt(x / 1000, 2)} m…`], ['-']);
+  it.push(['loads', 'Obciążenia…'], ['sec', 'Przekrój…'], ['brace', 'Stężenia…'], ['dims', `${showDims ? '✓ ' : ''}Wymiary`]);
+  if (q) it.push(['-'], ['none', 'Odznacz (Esc)']);
+  Q.ctxMenu(ev.clientX, ev.clientY, it, a => {
+    if (a === 'at') BS.W3.atXPopup(x);
+    else if (a === 'addl') A.loadPopup(null, { x: Math.round(x / 50) * 0.05, pl });
+    else if (a === 'addb') { S.stezenia.push({ x: Math.round(x / 50) * 0.05, pl, wys: 'srodek', skret: false }); changed(true); A.bracesPopup(S.stezenia.length - 1); }
+    else if (a === 'schemes') A.schemesPopup();
+    else if (a === 'dims') schTool('dims');
+    else selAct(a);
   });
 }
-function addLoadOf(k) {
-  const used = new Set(S.obciazenia.map(o => o.id)); const r = k === 'T' ? 'T' : k; let i = 1; while (used.has(r + i)) i++;
-  const nm = { G: 'Obciążenie stałe', Q: 'Obciążenie użytkowe', S: 'Śnieg', W: 'Wiatr', T: 'Temperatura / inne' }[k];
-  const L = { id: r + i, nazwa: nm, rodzaj: k, kat: 'Q-B', wyklucz: k === 'W' ? 'W' : '', aktywne: true, sklad: [k === 'W' ? { typ: 'q', kier: 'z', q0: 2, q1: '', x0: '', x1: '', wys: 'srodek' } : { typ: 'N', x: '', F: k === 'G' ? 100 : 50, ey: 0, ez: 0 }] };
-  S.obciazenia.push(L); changed(true); A.loadPopup(S.obciazenia.length - 1);
+function schTool(k) {
+  if (k === 'loads') A.loadsWin(); else if (k === 'sec') A.secPopup(); else if (k === 'brace') A.bracesPopup();
+  else if (k === 'dims') { showDims = !showDims; try { localStorage.setItem('ss.dims', showDims ? '1' : '0'); } catch (e) { /* */ } renderDataSide(); }
+}
+// znacznik wartości na wykresie (klik): linia na wysokości x w obu płaszczyznach z wartościami wykresu
+function pinVals(x, pl) {
+  if (!R || !R.env || R.errors.length) return '';
+  const xs = R.an.xs3; let i = 0; for (let j = 0; j < xs.length; j++) if (Math.abs(xs[j] - x) < Math.abs(xs[i] - x)) i = j;
+  const sf = schF(), F = sf && sf.F, e = R.env;
+  const two = (a, b, k, d) => (a === b ? fmt(a / k, d) : `${fmt(a / k, d)} / ${fmt(b / k, d)}`);
+  if (diagMode === 'M') return F ? `M = ${fmt(F[pl].M[i] / 1e6, 1)} kNm` : `M = ${two((pl === 'y' ? e.My : e.Mz).max[i], (pl === 'y' ? e.My : e.Mz).min[i], 1e6, 1)} kNm`;
+  if (diagMode === 'V') return F ? `V = ${fmt(F[pl].V[i] / 1e3, 1)} kN` : `V = ${two((pl === 'y' ? e.Vz : e.Vy).max[i], (pl === 'y' ? e.Vz : e.Vy).min[i], 1e3, 1)} kN`;
+  if (diagMode === 'N') return F ? `N = ${fmt(F.N[i] / 1e3, 1)} kN` : `N = ${two(e.Nmax[i], e.Nmin[i], 1e3, 1)} kN`;
+  return '';
+}
+function drawPin(el) {
+  $$('svg.schemesvg', el).forEach(svg => {
+    const old = svg.querySelector('g.xpin'); if (old) old.remove();
+    if (schPin === null) return;
+    const mt = +svg.dataset.mt, hh = +svg.dataset.hh, Hmm = +svg.dataset.h, W = svg.viewBox.baseVal.width;
+    if (schPin < 0 || schPin > Hmm) return;
+    const y = mt + (1 - schPin / Hmm) * hh, v = pinVals(schPin, svg.dataset.pl), txt = `x = ${fmt(schPin / 1000, 2)} m${v ? ': ' + v : ''}`;
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g'); g.setAttribute('class', 'xpin'); g.setAttribute('pointer-events', 'none');
+    g.innerHTML = `<line x1="40" y1="${y}" x2="${W - 6}" y2="${y}" stroke="#a35d00" stroke-width="0.9" stroke-dasharray="3 3"/><rect x="${W - 8 - txt.length * 5.4}" y="${y - 14}" width="${txt.length * 5.4 + 4}" height="12" rx="2" fill="#a35d00" fill-opacity="0.92"/><text x="${W - 6}" y="${y - 5}" font-size="9.5" text-anchor="end" fill="#ffffff" font-weight="600" style="stroke:none;paint-order:normal;fill:#ffffff">${esc(txt)}</text>`;
+    svg.appendChild(g);
+  });
 }
 // wysokość x [mm] w miejscu kliknięcia na schemacie
 const xOfEv = (svg, ev) => { const r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal, py = vb.y + (ev.clientY - r.top) * vb.height / r.height; const mt = +svg.dataset.mt, hh = +svg.dataset.hh, Hmm = +svg.dataset.h; return Math.max(0, Math.min(Hmm, (1 - (py - mt) / hh) * Hmm)); };
+const selOf = (t) => {
+  const g = t.closest && t.closest('.ld, .supp, .brace, .schcol'); if (!g) return null;
+  if (g.classList.contains('ld')) return { t: 'ld', i: +g.dataset.li };
+  if (g.classList.contains('supp')) return { t: 'sup', pl: g.dataset.sup, end: g.dataset.end };
+  if (g.classList.contains('brace')) return { t: 'br', i: +g.dataset.brace };
+  return { t: 'col' };
+};
 function bindSide(el) {
   $$('[data-diag]', el).forEach(b => b.addEventListener('click', () => { diagMode = b.dataset.diag; try { localStorage.setItem('ss.diag', diagMode); } catch (e) { /* */ } renderDataSide(); }));
-  $$('[data-act]', el).forEach(b => b.addEventListener('click', () => doAct(b.dataset.act)));
-  $$('[data-stool]', el).forEach(b => b.addEventListener('click', () => { const k = b.dataset.stool; if (k === 'sup') A.supportPopup('y'); else if (k === 'schemes') A.schemesPopup(); else if (k === 'v3d') BS.W3.open(true); }));
+  $$('[data-tool]', el).forEach(b => b.addEventListener('click', () => schTool(b.dataset.tool)));
   const cs = $('#schCombo', el); if (cs) cs.addEventListener('change', () => A.setSchCombo(cs.value === '' ? null : +cs.value));
   const se = $('#schEnv', el); if (se) se.onclick = () => A.setSchCombo(null);
   $$('[data-selc]', el).forEach(tr => tr.addEventListener('click', () => A.setSchCombo(schCombo === +tr.dataset.selc ? null : +tr.dataset.selc)));
   $$('[data-selcid]', el).forEach(tr => tr.addEventListener('click', () => { const i = R.res.findIndex(cr => cr.combo.id === tr.dataset.selcid); if (i >= 0) A.setSchCombo(i); }));
-  // obciążenia: klik – zmiana, prawy – menu
-  $$('.ld', el).forEach(g => { g.addEventListener('click', ev => { ev.stopPropagation(); A.loadPopup(+g.dataset.li); }); g.addEventListener('contextmenu', ev => { ev.preventDefault(); ev.stopPropagation(); loadMenu(+g.dataset.li, ev.clientX, ev.clientY); }); });
-  $$('.supp', el).forEach(g => { g.addEventListener('click', ev => { ev.stopPropagation(); A.supportPopup(g.dataset.sup); }); g.addEventListener('contextmenu', ev => { ev.preventDefault(); ev.stopPropagation(); const pl = g.dataset.sup; Q.ctxMenu(ev.clientX, ev.clientY, [['sup', `Warunki podparcia (${pl === 'y' ? 'x–z' : 'x–y'})…`], ['schemes', 'Schematy typowe…'], ['base', 'Podstawa słupa…']], a => { if (a === 'sup') A.supportPopup(pl); else if (a === 'schemes') A.schemesPopup(); else A.basePopup(); }); }); });
-  $$('.brace', el).forEach(g => { g.addEventListener('click', ev => { ev.stopPropagation(); A.bracesPopup(+g.dataset.brace); }); g.addEventListener('contextmenu', ev => { ev.preventDefault(); ev.stopPropagation(); const i = +g.dataset.brace; Q.ctxMenu(ev.clientX, ev.clientY, [['edit', `Zmień stężenie S${i + 1}…`], ['del', 'Usuń stężenie']], a => { if (a === 'edit') A.bracesPopup(i); else { S.stezenia.splice(i, 1); changed(true); } }); }); });
-  $$('.schcol', el).forEach(g => {
-    g.addEventListener('click', ev => { if (ev.detail > 1) return; A.secPopup(); });
-    g.addEventListener('dblclick', ev => { const svg = g.closest('svg'); A.loadPopup(null, { x: Math.round(xOfEv(svg, ev) / 50) * 0.05, pl: svg.dataset.pl }); });
+  // elementy schematu: lewy – zaznacz, dwuklik – okno, prawy – menu
+  $$('svg.schemesvg', el).forEach(svg => {
+    svg.addEventListener('click', ev => {
+      const q = selOf(ev.target);
+      if (q) { ev.stopPropagation(); if (ev.detail > 1) return; setSel(q, true); return; }
+      const hit = ev.target.closest('.mhit, .dgm');
+      if (hit) { const x = xOfEv(svg, ev); schPin = schPin !== null && Math.abs(schPin - x) < 0.03 * (+svg.dataset.h) ? null : x; drawPin(el); return; }
+      if (schSel) { schSel = null; applySel(el); }
+    });
+    svg.addEventListener('dblclick', ev => {
+      const q = selOf(ev.target);
+      if (q && q.t === 'col') { A.loadPopup(null, { x: Math.round(xOfEv(svg, ev) / 50) * 0.05, pl: svg.dataset.pl }); return; }
+      if (q) { schSel = q; applySel(el); openSel(q); return; }
+      if (ev.target.closest('.mhit, .dgm')) BS.W3.atXPopup(xOfEv(svg, ev));
+    });
+    svg.addEventListener('contextmenu', ev => { ev.preventDefault(); const q = selOf(ev.target); if (q && !sameSel(q, schSel)) { schSel = q; applySel(el); } schMenu(ev, svg); });
   });
-  // wykresy: klik – siły i sprawdzenia na wysokości x
-  $$('.schemesvg .mhit, .schemesvg .dgm', el).forEach(r => r.addEventListener('click', ev => { ev.stopPropagation(); const svg = r.closest('svg'); BS.W3.atXPopup(xOfEv(svg, ev)); }));
-  $$('svg.schemesvg', el).forEach(svg => svg.addEventListener('contextmenu', ev => { ev.preventDefault(); const x = xOfEv(svg, ev), pl = svg.dataset.pl; Q.ctxMenu(ev.clientX, ev.clientY, [['at', `Siły i sprawdzenia na x = ${fmt(x / 1000, 2)} m…`], ['load', 'Dodaj obciążenie w tym miejscu…'], ['brace', 'Dodaj stężenie w tym miejscu…'], ['-'], ['sup', `Warunki podparcia (${pl === 'y' ? 'x–z' : 'x–y'})…`], ['schemes', 'Schematy typowe…'], ['sec', 'Przekrój…'], ['base', 'Podstawa słupa…']], a => {
-    if (a === 'at') BS.W3.atXPopup(x); else if (a === 'load') A.loadPopup(null, { x: Math.round(x / 50) * 0.05, pl }); else if (a === 'brace') { S.stezenia.push({ x: Math.round(x / 50) * 0.05, pl, wys: 'srodek', skret: false }); changed(true); A.bracesPopup(S.stezenia.length - 1); } else if (a === 'sup') A.supportPopup(pl); else if (a === 'schemes') A.schemesPopup(); else if (a === 'sec') A.secPopup(); else A.basePopup();
-  }); }));
-  // legenda i zestawienie obciążeń
-  $$('[data-lgon]', el).forEach(cb => cb.addEventListener('change', () => { const L = S.obciazenia[+cb.dataset.lgon]; if (L) { L.aktywne = cb.checked; changed(true); } }));
-  $$('[data-lgopen]', el).forEach(b => { b.addEventListener('click', () => A.loadPopup(+b.dataset.lgopen)); b.addEventListener('contextmenu', ev => { ev.preventDefault(); loadMenu(+b.dataset.lgopen, ev.clientX, ev.clientY); }); });
-  $$('[data-openload]', el).forEach(tr => { tr.addEventListener('click', e => { if (e.target.closest('input')) return; A.loadPopup(+tr.dataset.openload); }); tr.addEventListener('contextmenu', ev => { ev.preventDefault(); loadMenu(+tr.dataset.openload, ev.clientX, ev.clientY); }); });
+  // zestawienie obciążeń: klik – zaznacz, dwuklik – zmień, prawy – menu
+  $$('[data-openload]', el).forEach(tr => {
+    const i = +tr.dataset.openload;
+    tr.addEventListener('click', e => { if (e.target.closest('input')) return; if (e.detail > 1) return; setSel({ t: 'ld', i }, true); });
+    tr.addEventListener('dblclick', e => { if (e.target.closest('input')) return; schSel = { t: 'ld', i }; applySel(el); A.loadPopup(i); });
+    tr.addEventListener('contextmenu', ev => { ev.preventDefault(); schSel = { t: 'ld', i }; applySel(el); schMenu(ev, null); });
+  });
   $$('[data-loff]', el).forEach(cb => cb.addEventListener('change', () => { S.obciazenia[+cb.dataset.loff].aktywne = cb.checked; changed(true); }));
-  $$('[data-addl]', el).forEach(b => b.addEventListener('click', () => addLoadOf(b.dataset.addl)));
 }
 
 /* ================================================================ ZAKŁADKI */
@@ -619,7 +716,7 @@ async function newProject() {
   $('#npC', m).onclick = Q.closeModal;
   $$('[data-np]', m).forEach(b => b.addEventListener('click', () => {
     Q.closeModal();
-    S = startState(b.dataset.np); COLS = null; curC = 0; filePath = ''; dirty = false; schCombo = null;
+    S = startState(b.dataset.np); COLS = null; curC = 0; filePath = ''; dirty = false; schCombo = null; schSel = null; schPin = null;
     $('#projName').value = S.meta.nazwa; rendered = {}; renderInputs(); recalc(); updateTitle(); autosave(); A.selectTab('data');
   }));
 }
@@ -634,7 +731,7 @@ function about() {
 }
 function doAct(a) {
   ({ new: newProject, open: openFile, save: () => saveFile(false), saveas: () => saveFile(true), print: doPrint, exporthtml: () => BS.V.exportHTML(), about,
-    secwin: () => A.secPopup(), sectab: () => A.secTablePopup(), addload: () => A.loadPopup(null), braces: () => A.bracesPopup(), basewin: () => A.basePopup(), ndp: () => A.ndpPopup(), meta: () => A.metaPopup() }[a] || (() => {}))();
+    secwin: () => A.secPopup(), sectab: () => A.secTablePopup(), addload: () => A.loadPopup(null), loads: () => A.loadsWin(), braces: () => A.bracesPopup(), basewin: () => A.basePopup(), ndp: () => A.ndpPopup(), meta: () => A.metaPopup() }[a] || (() => {}))();
 }
 A.doAct = doAct;
 
@@ -660,7 +757,7 @@ function init() {
     else if (e.ctrlKey && k === 'n') { e.preventDefault(); newProject(); }
     else if (e.ctrlKey && k === 'p') { e.preventDefault(); doPrint(); }
     else if (e.key === 'F2') { e.preventDefault(); A.selectTab('report'); }
-    else if (e.key === 'Escape') { Q.closeList(); Q.closeCtx(); if (Q.isModal()) Q.closeModal(); }
+    else if (e.key === 'Escape') { const ctx = !!document.querySelector('.ctxmenu, .inled'); const had = Q.isModal() || ctx; Q.closeList(); Q.closeCtx(); const ie = document.querySelector('.inled'); if (ie) ie.remove(); if (ctx) return; if (Q.isModal()) Q.closeModal(); else if (!had && A.clearSel) A.clearSel(); }
   });
   $('#modal').addEventListener('mousedown', e => { if (e.target.id === 'modal') Q.closeModal(); });
   const wrap = () => $('#p-data .datawrap'), setDsl = v => { const w = wrap(); if (w) w.style.setProperty('--dsl', v); };

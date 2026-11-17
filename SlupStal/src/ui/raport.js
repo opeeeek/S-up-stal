@@ -47,6 +47,7 @@ RP.secTable = function (sec) {
     ['W<sub>el,z</sub>', cm3(sec.Wel_z), 'cm³'], ['W<sub>pl,z</sub>', cm3(sec.Wpl_z), 'cm³'], ['i<sub>y</sub>', fm(sec.iy / 10, 2), 'cm'], ['i<sub>z</sub>', fm(sec.iz / 10, 2), 'cm'], ['I<sub>t</sub>', cm4(sec.It), 'cm⁴'],
     ['I<sub>w</sub>', fm(sec.Iw / 1e9, 2), '·10³ cm⁶'], ['A<sub>v,z</sub>', cm2(sec.Avz), 'cm²'], ['A<sub>v,y</sub>', cm2(sec.Avy), 'cm²'], ['masa', fm(sec.masa, 1), 'kg/m']];
   if (sec.kind === 'I' && !sec.sym) r.push(['z<sub>0</sub> (ŚŚ – ŚC)', fm(sec.z0, 1), 'mm'], ['β<sub>z</sub>', fm(sec.betaZ, 1), 'mm']);
+  if (sec.kind === 'CC') r.push(['gałąź', esc(sec.ch.nazwa), ''], ['A<sub>ch</sub>', cm2(sec.A_ch), 'cm²'], ['I<sub>ch</sub> (oś własna ∥ z)', cm4(sec.I_ch), 'cm⁴'], ['i<sub>min</sub>', fm(sec.i_ch / 10, 2), 'cm'], ['I<sub>y,ch</sub>', cm4(sec.Iy_ch), 'cm⁴'], ['e (ŚC gałęzi od grzbietu)', fm(sec.e, 1), 'mm'], ['h<sub>0</sub> (rozstaw osi gałęzi)', fm(sec.h0, 1), 'mm'], ['B (szerokość)', fm(sec.B, 0), 'mm'], [sec.bu && !sec.buPack ? 'przewiązki b<sub>b</sub> × t<sub>b</sub> / rozstaw a' : 'przekładki – rozstaw a', sec.bu && !sec.buPack ? `${fm(sec.pb, 0)} × ${fm(sec.pt, 0)} / ${fm(sec.pa, 0)}` : fm(sec.pa, 0), 'mm']);
   return tbl(['wielkość', 'wartość', 'jedn.'], r);
 };
 RP.classTable = function (k) {
@@ -131,6 +132,64 @@ RP.tok = function (c, R, S) {
       h += line(`h<sub>w</sub>/t<sub>w</sub> = ${fm(sb.ht, 1)} > 72ε/η = ${fm(sb.limit, 1)} → wymagane sprawdzenie`, 'PN-EN 1993-1-5, 5.1(2)');
       h += eq('λ̄_w', 'h_w/(86,4·t·ε)', '', fm(sb.lw, 3), '', 'PN-EN 1993-1-5, 5.3') + eq('χ_w', '', '', fm(sb.chi, 3), '', 'tabl. 5.1') + eq('V_{b,Rd}', 'χ_w·f_{yw}·h_w·t/(√3·γ_{M1})', '', kN(sb.Vb), 'kN', '5.2');
       h += verd(kN(c.Ed), kN(c.Rd), c.util, 'kN');
+      break;
+    }
+    case c.id === 'BUs': {
+      h += head('Słup złożony z dwóch ceowników – warunek pręta jednolitego');
+      h += line(`${esc(sec.nazwa)}; gałęzie połączone przekładkami co a = ${fm(sec.pa, 0)} mm; i<sub>min</sub> gałęzi = ${fm(sec.i_ch, 1)} mm`, '6.4.4');
+      h += eq('a_{max}', '15·i_{min}', `15·${fm(sec.i_ch, 1)}`, fm(sec.lim15, 0), 'mm', 'tabl. 6.9');
+      h += sec.buPack ? line(`a = ${fm(sec.pa, 0)} mm > ${fm(sec.lim15, 0)} mm – warunek tabl. 6.9 niespełniony: słup sprawdzany jak pręt z przewiązkami (przekładki jako przewiązki, S<sub>v</sub> = 2π²EI<sub>ch</sub>/a²), 6.4.4(2)`, '6.4.4(2)')
+        : line(`a = ${fm(sec.pa, 0)} mm ≤ ${fm(sec.lim15, 0)} mm – słup sprawdzany jako pręt jednolity (bez wpływu podatności na ścinanie): wyboczenie względem osi z–z z I<sub>z</sub> = ${cm4(sec.Iz)} cm⁴, krzywa c`, '6.4.4(1)') + verd(fm(sec.pa, 0), fm(sec.lim15, 0), c.util, 'mm');
+      break;
+    }
+    case c.id === 'BU1' || c.id === 'BU2' || c.id === 'BUb' || c.id === 'BUw' || c.id === 'BUp': {
+      const q = d.bu, E = 210000;
+      h += head(c.id === 'BU1' ? 'Słup złożony – gałąź między przewiązkami (wyboczenie względem osi niematerialnej z–z wg 6.4)' : c.id === 'BU2' ? 'Słup złożony – gałąź: wyboczenie względem osi materiałowej y–y' : c.id === 'BUb' ? 'Słup złożony – przewiązki' : c.id === 'BUw' ? 'Słup złożony – spoiny przewiązek' : 'Słup złożony – warunki konstrukcyjne');
+      h += line(`${esc(sec.nazwa)}; kombinacja ${cmb(d.combo)}${d.vr ? ' · ' + esc(d.vr) : ''}`);
+      h += line(`Gałąź ${esc(sec.ch.nazwa)}: A<sub>ch</sub> = ${cm2(q.Ach)} cm², I<sub>ch</sub> = ${cm4(q.Ich)} cm⁴ (oś własna gałęzi równoległa do z), h<sub>0</sub> = ${fm(q.h0, 1)} mm, a = ${fm(q.a, 0)} mm, n = ${q.n} płaszczyzny przewiązek`, '6.4.1, 6.4.3');
+      if (c.id === 'BU1' || c.id === 'BU2') {
+        h += line(`Długość wyboczeniowa względem osi niematerialnej L = L<sub>cr,z</sub> = ${fm(q.L / 1000, 3)} m (MES – rzeczywiste podparcie i stężenia); N<sub>Ed</sub> = ${kN(q.NEd)} kN; M<sub>Ed</sub><sup>I</sup> = ${kNm(q.MI)} kNm (moment I rzędu względem osi z–z${R.method === 'II_glob' ? ', z efektem φ' : ''})`, '6.4.1(6)');
+        h += eq('I_1', '0,5·h_0²·A_{ch} + 2·I_{ch}', `0,5·${fm(q.h0, 1)}²·${fm(q.Ach, 0)} + 2·${cm4(q.Ich)}·10⁴`, cm4(q.I1), 'cm⁴', 'tabl. 6.8');
+        h += eq('i_0', '√(I_1/(2A_{ch}))', '', fm(q.i0, 1), 'mm') + eq('λ', 'L/i_0', `${fm(q.L, 0)}/${fm(q.i0, 1)}`, fm(q.lam, 1), '') + eq('μ', q.lam <= 75 ? '1,0 (λ ≤ 75)' : q.lam >= 150 ? '0 (λ ≥ 150)' : '2 − λ/75', '', fm(q.mu, 3), '', 'tabl. 6.8');
+        h += eq('I_{eff}', '0,5·h_0²·A_{ch} + 2μ·I_{ch}', '', cm4(q.Ieff), 'cm⁴', '(6.74)');
+        if (q.pack) h += eq('S_v', '2π²·E·I_{ch}/a²', `2π²·${E}·${cm4(q.Ich)}·10⁴/${fm(q.a, 0)}²`, kN(q.Sv), 'kN', '(6.73) – przekładki');
+        else h += eq('I_b', 't_b·b_b³/12', `${fm(sec.pt, 0)}·${fm(sec.pb, 0)}³/12`, cm4(q.Ib), 'cm⁴') + eq('S_v', '24·E·I_{ch}/[a²·(1 + 2I_{ch}h_0/(n·I_b·a))] ≤ 2π²EI_{ch}/a²', `min(${kN(q.Sv1)}; ${kN(q.Sv2)})`, kN(q.Sv), 'kN', '(6.73)');
+        h += eq('N_{cr}', 'π²·E·I_{eff}/L²', '', kN(q.Ncr), 'kN', '(6.72)') + eq('e_0', 'L/500', '', fm(q.e0, 1), 'mm', '6.4.1(1)');
+        h += eq('M_{Ed}', '(N_{Ed}·e_0 + M_{Ed}^I)/(1 − N_{Ed}/N_{cr} − N_{Ed}/S_v)', `(${kN(q.NEd)}·${fm(q.e0 / 1000, 4)} + ${kNm(q.MI)})/(1 − ${kN(q.NEd)}/${kN(q.Ncr)} − ${kN(q.NEd)}/${kN(q.Sv)})`, isFinite(q.MEd) ? kNm(q.MEd) : '∞', 'kNm', '(6.69)');
+        h += eq('N_{ch,Ed}', '0,5·N_{Ed} + M_{Ed}·h_0·A_{ch}/(2·I_{eff})', '', kN(q.Nch), 'kN', '(6.69)');
+        h += eq('V_{Ed}', 'max(π·M_{Ed}/L; V_{y,Ed}^I)', `max(${kN(q.VEd6)}; ${kN(q.VEd - 0 > q.VEd6 ? q.VEd : 0)})`, kN(q.VEd), 'kN', '(6.70)');
+      }
+      if (c.id === 'BU1') {
+        const lam1 = Math.PI * Math.sqrt(E / fy);
+        h += line(`Wyboczenie gałęzi między przewiązkami: L<sub>ch</sub> = a = ${fm(q.a, 0)} mm, względem osi własnej gałęzi (i<sub>min</sub> = ${fm(sec.i_ch, 1)} mm), krzywa c`, 'rys. 6.9, tabl. 6.2');
+        h += eq('λ̄_{ch}', 'a/(i_{min}·λ_1)', `${fm(q.a, 0)}/(${fm(sec.i_ch, 1)}·${fm(lam1, 1)})`, fm(q.lamCh, 4), '') + eq('χ_{ch}', '', '', fm(q.chiCh, 4), '', '6.3.1.2');
+        h += eq('N_{b,Rd,ch}', 'χ_{ch}·A_{ch}·f_y/γ_{M1}', '', kN(q.NbCh), 'kN', '6.3.1.1');
+        h += eq('M_{ch,Ed}', 'V_{Ed}·a/4', `${kN(q.VEd)}·${fm(q.a / 1000, 3)}/4`, kNm(q.Mch), 'kNm', 'rys. 6.11') + eq('M_{ch,Rd}', 'W_{el,min,ch}·f_y/γ_{M0}', `${cm3(sec.Wel_z_ch)}·10³·${fm(fy, 0)}/${fm(g0, 2)}`, kNm(q.MchRd), 'kNm');
+        h += eq('η', 'N_{ch,Ed}/N_{b,Rd,ch} + M_{ch,Ed}/M_{ch,Rd}', `${kN(q.Nch)}/${kN(q.NbCh)} + ${kNm(q.Mch)}/${kNm(q.MchRd)}`, fm(c.util, 3), '≤ 1', '6.4.3.1(2)', c.util <= 1 ? ['ok', '✔'] : ['fail', '✖']);
+      }
+      if (c.id === 'BU2') {
+        h += line(`Wyboczenie gałęzi względem osi materiałowej y–y na długości L<sub>cr,y</sub> = ${fm(q.Lcry / 1000, 3)} m (krzywa c); gałąź przenosi połowę momentu M<sub>y,Ed</sub> = ${kNm(2 * q.MyCh)} kNm; k<sub>yy</sub> = ${fm(q.kyy, 3)} (z interakcji pręta)`, '6.4.1, 6.3.3');
+        h += eq('χ_{y,ch}', '', `λ̄ = ${fm(q.lamY, 4)}`, fm(q.chiY, 4), '') + eq('N_{b,y,Rd,ch}', 'χ_{y,ch}·A_{ch}·f_y/γ_{M1}', '', kN(q.NbY), 'kN');
+        h += eq('M_{y,Rd,ch}', 'W_{el,y,ch}·f_y/γ_{M1}', `${cm3(sec.Wel_y_ch)}·10³·${fm(fy, 0)}/${fm(g1, 2)}`, kNm(q.MyRdCh), 'kNm');
+        h += eq('η', 'N_{ch,Ed}/N_{b,y,Rd,ch} + k_{yy}·(M_{y,Ed}/2)/M_{y,Rd,ch}', `${kN(q.Nch)}/${kN(q.NbY)} + ${fm(q.kyy, 3)}·${kNm(q.MyCh)}/${kNm(q.MyRdCh)}`, fm(c.util, 3), '≤ 1', '6.3.3', c.util <= 1 ? ['ok', '✔'] : ['fail', '✖']);
+      }
+      if (c.id === 'BUb') {
+        h += line(`V<sub>Ed</sub> = ${kN(q.VEd)} kN (wg 6.70, kombinacja jak wyżej); przewiązka ${fm(sec.pb, 0)} × ${fm(sec.pt, 0)} mm w każdej z n = 2 płaszczyzn`, 'rys. 6.11');
+        h += eq('T_b', 'V_{Ed}·a/(n·h_0)', `${kN(q.VEd)}·${fm(q.a, 0)}/(2·${fm(q.h0, 1)})`, kN(q.Tb), 'kN') + eq('M_b', 'V_{Ed}·a/(2n)', '', kNm(q.Mb), 'kNm');
+        h += eq('σ', 'M_b/(t_b·b_b²/6)', '', fm(q.sb, 1), 'MPa') + eq('τ', '1,5·T_b/(t_b·b_b)', '', fm(q.tb, 1), 'MPa') + eq('σ_{red}', '√(σ² + 3τ²)', '', fm(q.sred, 1), 'MPa', '6.2.1(5)');
+        h += verd(fm(q.sred, 1), fm(q.fyd, 1), c.util, 'MPa');
+      }
+      if (c.id === 'BUw') {
+        const w = q.weld;
+        h += line(`Spoiny pachwinowe a = ${fm(w.aw, 0)} mm: dwie wzdłuż zakładu c = ${fm(w.c, 0)} mm i jedna na krawędzi przewiązki (b<sub>b</sub> = ${fm(sec.pb, 0)} mm); metoda sprężysta (biegunowy moment bezwładności grupy spoin)`, 'PN-EN 1993-1-8, 4.5.3.3');
+        h += eq('A_w', 'a·(2c + b_b)', '', fm(w.Aw, 0), 'mm²') + eq('I_0', 'I_u + I_v', '', fm(w.Ip / 1e4, 1), 'cm⁴') + eq('τ_{max}', '√[(M_b·v/I_0)² + (T_b/A_w + M_b·u/I_0)²]', `T_b = ${kN(q.Tb)} kN, M_b = ${kNm(q.Mb)} kNm`, fm(w.tw, 1), 'MPa');
+        h += eq('f_{vw,d}', 'f_u/(√3·β_w·γ_{M2})', `${fm(w.fu, 0)}/(√3·${fm(w.bw, 2)}·${fm(ndp.gM2, 2)})`, fm(w.fvw, 1), 'MPa', '(4.4)');
+        h += verd(fm(w.tw, 1), fm(w.fvw, 1), c.util, 'MPa');
+      }
+      if (c.id === 'BUp') {
+        h += eq('H/a', '', `${fm(R.md.H, 0)}/${fm(q.a, 0)}`, fm(q.panels, 2), '≥ 3', '6.4.1(1)', q.panels >= 3 ? ['ok', '✔'] : ['warn', 'za mało przedziałów']);
+        h += eq('n·I_b/h_0', '', '', fm(q.nIb, 0), 'mm³') + eq('10·I_{ch}/a', '', '', fm(q.ich10, 0), 'mm³', '6.4.3.1', q.stiffOk ? ['ok', '✔ przewiązki sztywne'] : ['warn', 'przewiązki podatne – S_v zmniejszone']);
+      }
       break;
     }
     case c.id === 'By' || c.id === 'Bz': {

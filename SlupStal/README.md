@@ -10,7 +10,8 @@ każdego parametru.
 
 | Obszar | Zakres | Norma |
 |---|---|---|
-| Przekroje | IPE, HEA, HEB, HEM; dwuteowniki spawane (także monosymetryczne); rury SHS/RHS gorąco wykończone i zimnogięte, także wymiary dowolne; rury okrągłe CHS | PN-EN 10365, 10210, 10219 |
+| Przekroje | IPE, HEA, HEB, HEM; dwuteowniki spawane (także monosymetryczne); rury SHS/RHS gorąco wykończone i zimnogięte, także wymiary dowolne; rury okrągłe CHS; **słupy z dwóch ceowników** UPN/UPE: plecami z przekładkami lub rozstawione z przewiązkami (półki na zewnątrz / do wewnątrz) | PN-EN 10365, 10210, 10219 |
+| Pręty złożone | oś materiałowa – jak pręt jednolity; oś niematerialna – I<sub>eff</sub> (6.74, tabl. 6.8), S<sub>v</sub> (6.73), N<sub>cr</sub>, e<sub>0</sub> = L/500, M<sub>Ed</sub> i N<sub>ch,Ed</sub> (6.69), V<sub>Ed</sub> (6.70); gałąź między przewiązkami z momentem V<sub>Ed</sub>·a/4, gałąź względem osi materiałowej, przewiązki (σ, τ), spoiny przewiązek; przekładki ≤ 15·i<sub>min</sub> – pręt jednolity (tabl. 6.9); ≥ 3 przedziały | PN-EN 1993-1-1, 6.4; PN-EN 1993-1-8, 4.5 |
 | Kombinacje | 6.10 lub 6.10a/6.10b, γ<sub>G,sup</sub>/γ<sub>G,inf</sub>, wszystkie podzbiory zmiennych, grupy wykluczające się (np. kierunki wiatru), wyjątkowa, pożarowa, SGU (char./częsta/quasi-stała) | PN-EN 1990 + ZK |
 | Analiza globalna | I rząd; II rząd z imperfekcją przechyłową φ; II rząd z φ i łukowymi e₀ (MES, P-δ i P-Δ, imperfekcje jako geometria początkowa); α<sub>cr</sub>; pominięcie φ przy H<sub>Ed</sub> ≥ 0,15 V<sub>Ed</sub> | 5.2, 5.3 |
 | Obciążenia krytyczne | MES dla rzeczywistego rozkładu N(x): giętne w obu płaszczyznach (przechyłowe / nieprzechyłowe), skrętne, giętno-skrętne (także względem osi wymuszonej przy stężeniu pasa); L<sub>cr</sub> = π√(EI/N<sub>cr</sub>) | 6.3.1 |
@@ -28,12 +29,16 @@ k<sub>c</sub>, C<sub>my</sub>, C<sub>mz</sub>, C<sub>mLT</sub>, φ, e₀, f<sub>
 
 ## Obsługa (jak w BelkaStal / SłupŻB)
 
-* **Schemat statyczny (zakładka Dane)** – dwie płaszczyzny (x–z: M<sub>y</sub>, x–y: M<sub>z</sub>); klik na obciążeniu –
-  edycja, na podporze – warunki podparcia, na stężeniu – edycja, na słupie – przekrój, dwuklik – nowe
-  obciążenie na tej wysokości, klik na wykresie – siły i sprawdzenia na wysokości x, prawy przycisk – menu
-  (zmień, duplikuj, wyłącz/włącz, usuń, dodaj stężenie…). Pod schematem: wykres M / V / N / przemieszczenia /
-  postać wyboczenia oraz wybór kombinacji (obwiednia SGN lub dowolna kombinacja), legenda obciążeń,
-  „Zestawienie obciążeń” z wyłączaniem, „Kombinacje decydujące”, siły na fundament, „Schematy typowe…”.
+* **Schemat statyczny (zakładka Dane)** – jak w BelkaŻB: **lewy przycisk zaznacza** element (słup, obciążenie,
+  podporę – każdą osobno: podstawa / wierzchołek w każdej płaszczyźnie, stężenie), **prawy przycisk – menu**
+  zaznaczonego elementu (zmień, duplikuj, wyłącz/włącz, usuń, obciążenie lub stężenie na tej wysokości, schematy
+  typowe przy podporze), **dwuklik – okno zmiany**; Esc – odznacz. Klik na wykresie – znacznik wartości na danej
+  wysokości (obie płaszczyzny), dwuklik – siły i sprawdzenia w tym miejscu. Nad schematem: Obciążenia (jedyne
+  miejsce zadawania obciążeń – lista, dodawanie, zmiana), Przekrój, Stężenia, Wymiary. Pod schematem: wykres
+  M / V / N / przemieszczenia / postać wyboczenia, wybór kombinacji, „Zestawienie obciążeń”, „Kombinacje
+  decydujące”, siły na fundament.
+* **Podstawa** – rysunek podstawy jest klikalny: element (blacha, kotwy, spoiny, podlewka, fundament) – jego
+  parametry w projektancie podstawy; wymiar (b<sub>p</sub>, l<sub>p</sub>, t<sub>p</sub>, rozstaw kotew, podlewka) – zmiana wartości wprost na rysunku.
 * **Słup i podstawa** – widok 2D (rzut z podstawą, fundamentem, stężeniami) przełączany na **widok 3D**
   (obrót, przesuw, powiększenie, widoki standardowe; obciążenia, fundament, postacie wyboczenia: giętne y/z,
   skrętne/giętno-skrętne, zwichrzenie, ugięcia SGU); przekrój pod kursorem, zestawienie materiałów, DXF.
@@ -70,7 +75,7 @@ Ikona: `node host/make-icon.js` i `rsrc -ico host/slupstal.ico -arch amd64 -o ho
 ```bash
 node test/fe.test.js         # MES wobec rozwiązań zamkniętych (N_cr, II rząd, imperfekcje, N_cr,T, M_cr, N_cr,TF)
 node test/engine.test.js     # przykłady liczone ręcznie + przegląd 28 konfiguracji + dobór
-node test/ui.test.js         # test funkcjonalny interfejsu (Playwright/Chromium): 39 scenariuszy
+node test/ui.test.js         # test funkcjonalny interfejsu (Playwright/Chromium): 51 scenariuszy
 ```
 
 ## Struktura
@@ -84,6 +89,7 @@ node test/ui.test.js         # test funkcjonalny interfejsu (Playwright/Chromium
 ## Założenia i ograniczenia (opisane także w raporcie)
 
 * Słupy pryzmatyczne (stały przekrój na wysokości), siła podłużna przekazywana na podstawę.
+* Słupy z dwóch ceowników z przewiązkami: zwichrzenie i wyboczenie skrętne pominięte (przekrój dwugałęziowy usztywniony przewiązkami); klasa 4 gałęzi – poza zakresem; podstawa – wspólna blacha pod obiema gałęziami.
 * Podstawa utwierdzona – model dla M<sub>y</sub> wg tabl. 6.7; dla M<sub>z</sub> model uproszczony z liniową
   interakcją M<sub>y</sub>/M<sub>j,y,Rd</sub> + M<sub>z</sub>/M<sub>j,z,Rd</sub>; zakotwienie kotew w betonie (PN-EN 1992-4) – poza zakresem.
 * Rura okrągła klasy 4 (PN-EN 1993-1-6) i podstawa utwierdzona rury okrągłej – poza zakresem.

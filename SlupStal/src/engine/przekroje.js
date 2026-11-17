@@ -5,7 +5,9 @@
    • dwuteowniki spawane (bi- i monosymetryczne względem osi z),
    • rury kwadratowe i prostokątne gorąco wykończone (PN-EN 10210)
      i formowane na zimno (PN-EN 10219), także o wymiarach dowolnych,
-   • rury okrągłe CHS gorąco wykończone i formowane na zimno.
+   • rury okrągłe CHS gorąco wykończone i formowane na zimno,
+   • słupy złożone z dwóch ceowników UPN / UPE (plecami z przekładkami;
+     rozstawione z przewiązkami – półkami na zewnątrz lub do wewnątrz).
    Charakterystyki liczone z geometrii (wieloboki z zaokrągleniami, otwory
    jako pierścienie o przeciwnej orientacji): A, Iy, Iz, Wel, Wpl, It, Iw,
    środek ścinania, βz; części ścianek do klasyfikacji.
@@ -83,8 +85,10 @@ P.RODZAJE = {
   walc: { n: 'Dwuteownik walcowany (IPE, HEA, HEB, HEM)', serie: ['IPE', 'HEA', 'HEB', 'HEM'] },
   spaw: { n: 'Dwuteownik spawany', serie: [] },
   rura: { n: 'Rura kwadratowa / prostokątna', serie: ['SHS', 'RHS', 'wlasna'] },
-  chs: { n: 'Rura okrągła (CHS)', serie: ['CHS', 'wlasna'] }
+  chs: { n: 'Rura okrągła (CHS)', serie: ['CHS', 'wlasna'] },
+  dwuc: { n: 'Dwa ceowniki (słup złożony)', serie: ['UPN', 'UPE'] }
 };
+P.UKLAD_CC = { plecy: 'plecami (][) z przekładkami', zew: 'rozstawione półkami na zewnątrz (] [) z przewiązkami', wew: 'rozstawione półkami do wewnątrz ([ ]) z przewiązkami' };
 P.SERIA_N = { IPE: 'IPE', HEA: 'HEA', HEB: 'HEB', HEM: 'HEM', UPN: 'UPN – półki zbieżne', UPE: 'UPE – półki równoległe', L: 'L – równoramienne', LN: 'L – nierównoramienne', SHS: 'kwadratowe', RHS: 'prostokątne', CHS: 'okrągłe (katalog)', wlasna: 'wymiary dowolne' };
 const sortNames = (o) => Object.keys(o).sort((a, b) => { const A = a.split('x').map(Number), B = b.split('x').map(Number); for (let i = 0; i < Math.max(A.length, B.length); i++) { const d = (A[i] || 0) - (B[i] || 0); if (d) return d; } return 0; });
 P.lista = (seria) => {
@@ -124,6 +128,12 @@ P.polyU = function (g) {
   if (r2 > 0) { pts.push([b - r2, h - tt]); arc(pts, b - r2, h - tt + r2, r2, -H, 0, 8); pts.push([b, h - tt + r2]); } else pts.push([b, h - tt]);
   pts.push([b, h], [0, h]);
   return pts;
+};
+// dwa ceowniki: plecy/zew – grzbiety środników w y = ±a/2, półki na zewnątrz; wew – grzbiety w y = ±B/2, półki do środka (B = a + 2b)
+P.polyCC = function (g) {
+  const u = P.polyU(g.ch), rev = (r) => r.slice().reverse();
+  if (g.uklad === 'wew') { const B = g.a + 2 * g.ch.b; return [u.map(([y, z]) => [-B / 2 + y, z]), rev(u.map(([y, z]) => [B / 2 - y, z]))]; }
+  return [rev(u.map(([y, z]) => [-g.a / 2 - y, z])), u.map(([y, z]) => [g.a / 2 + y, z])];
 };
 // kątownik: ramię pionowe (wys. h) przy y ∈ [0, t]; ramię poziome (szer. b) u dołu (poz = 'dol') lub u góry ('gora')
 P.polyL = function (g) {
@@ -206,6 +216,44 @@ P.geom = function (d) {
     const slope = d.seria === 'UPN' ? (h <= 300 ? 0.08 : 0.05) : 0;
     return { kind: 'U', typ, nazwa: `${d.seria} ${d.nr}`, seria: d.seria, nr: d.nr, h, b, bg: b, bd: b, tw, tf, tg: tf, td: tf, r, slope, aw: 0, sym: true };
   }
+  if (typ === 'dwuc') {
+    const ser = /^UP[NE]$/.test(d.seria) ? d.seria : 'UPN', row = (P.SERIE[ser] || {})[d.nr];
+    if (!row) throw new Error(`Nieznany ceownik ${ser} ${d.nr}`);
+    const [h, b, tw, tf, r] = row, slope = ser === 'UPN' ? (h <= 300 ? 0.08 : 0.05) : 0;
+    const ch = { kind: 'U', typ: 'ceow', nazwa: `${ser} ${d.nr}`, seria: ser, nr: d.nr, h, b, bg: b, bd: b, tw, tf, tg: tf, td: tf, r, slope, aw: 0, sym: true };
+    const uk = P.UKLAD_CC[d.uklad] ? d.uklad : 'zew';
+    const num = (v) => (v === '' || v === null || v === undefined || !isFinite(+v) || +v <= 0 ? null : +v);
+    // charakterystyki gałęzi (pojedynczy ceownik)
+    const pc = P.props(ch);
+    const e = pc.yc;                                       // środek ciężkości gałęzi od grzbietu środnika
+    let a = num(d.a), aAuto = false;
+    if (a === null) {
+      aAuto = true;
+      if (uk === 'plecy') a = 10;
+      else {                                              // rozstaw dający I_z,eff ≈ 1,1·I_y (μ = 1): 0,5·h0²·A_ch + 2·I_ch = 1,1·2·I_y,ch
+        const h0 = Math.sqrt(Math.max(0, (2.2 * pc.Iy - 2 * pc.Iz) / (0.5 * pc.A)));
+        a = uk === 'zew' ? h0 - 2 * e : h0 - 2 * b + 2 * e;
+        a = Math.max(uk === 'wew' ? 40 : 20, Math.ceil(a / 10) * 10);
+      }
+    }
+    const B = uk === 'wew' ? a + 2 * b : a + 2 * b;       // szerokość całkowita
+    const h0 = uk === 'wew' ? a + 2 * b - 2 * e : a + 2 * e;   // odległość osi gałęzi
+    const g = { kind: 'CC', typ, seria: ser, nr: d.nr, uklad: uk, ch, pc, e, a, aAuto, B, h0, h, b: B, bg: B, bd: B, tg: tf, td: tf, tw, tf, r, aw: 0, sym: true };
+    g.bu = uk !== 'plecy';                                // przewiązki (6.4.3); plecami – przekładki (6.4.4)
+    const H = num(d.Hcol) || 6000;
+    // przewiązki / przekładki – rozstaw osiowy a_p (wzdłuż słupa), szerokość b_b, grubość t_b, zakład c, spoina a_w
+    let pa = num(d.pa); g.paAuto = pa === null;
+    if (pa === null) pa = Math.max(300, Math.floor(Math.min(g.bu ? 40 * pc.iz : 15 * pc.iz, H / 3) / 50) * 50);
+    g.pa = pa;
+    if (g.bu) {
+      g.pb = num(d.pb) || Math.max(100, Math.ceil(0.75 * h0 / 10) * 10); g.pbAuto = !num(d.pb);
+      g.pt = num(d.pt) || 10; g.ptAuto = !num(d.pt);
+      g.pz = num(d.pc) || Math.max(30, Math.floor(0.8 * b / 5) * 5); g.pzAuto = !num(d.pc);
+      g.pw = num(d.pw) || 5; g.pwAuto = !num(d.pw);
+    } else { g.pt = a; g.pb = num(d.pb) || Math.max(60, Math.ceil(0.6 * h / 10) * 10); g.pbAuto = !num(d.pb); g.pw = num(d.pw) || 4; g.pwAuto = !num(d.pw); }
+    g.nazwa = `2×${ser} ${d.nr} – ${uk === 'plecy' ? 'plecami, przekładki' : uk === 'zew' ? 'półki na zewnątrz, przewiązki' : 'półki do wewnątrz, przewiązki'} (a = ${U.fmt(a, 0)} mm)`;
+    return g;
+  }
   if (typ === 'kat') {
     const row = (P.KAT[d.seria] || {})[d.nr];
     if (!row) throw new Error(`Nieznany kątownik ${d.seria} ${d.nr}`);
@@ -238,6 +286,7 @@ P.validate = function (g) {
   if (g.kind === 'CHS') { if (!(g.D > 0 && g.t > 0)) e.push('Wymiary rury muszą być dodatnie.'); else if (2 * g.t >= g.D) e.push('Grubość ścianki rury zbyt duża względem średnicy.'); return e; }
   if (g.kind === 'RHS') { if (!(g.h > 0 && g.b > 0 && g.t > 0)) e.push('Wymiary rury muszą być dodatnie.'); else if (2 * g.t >= Math.min(g.h, g.b)) e.push('Grubość ścianki rury zbyt duża względem wymiarów.'); return e; }
   if (g.kind === 'L' || g.kind === 'U') return e;
+  if (g.kind === 'CC') { if (!(g.a > 0)) e.push('Rozstaw gałęzi a musi być dodatni.'); if (g.uklad === 'wew' && g.a < 20) e.push('Rozstaw półek ceowników (układ [ ]) – co najmniej 20 mm (spawanie przewiązek).'); if (!(g.pa > 0)) e.push('Rozstaw przewiązek / przekładek musi być dodatni.'); return e; }
   if (!(g.h > 0 && g.bg > 0 && g.bd > 0 && g.tw > 0 && g.tg > 0 && g.td > 0)) e.push('Wymiary przekroju muszą być dodatnie.');
   if (g.tg + g.td >= g.h) e.push('Suma grubości pasów nie może przekraczać wysokości przekroju.');
   if (g.tw >= Math.min(g.bg, g.bd)) e.push('Grubość środnika musi być mniejsza od szerokości pasów.');
@@ -247,14 +296,14 @@ P.validate = function (g) {
 /* ------------------------------------------------------------ charakterystyki */
 P.props = function (d) {
   const g = d.kind ? d : P.geom(d);
-  const pts = g.kind === 'I' ? P.polygon(g) : g.kind === 'U' ? P.polyU(g) : g.kind === 'L' ? P.polyL(g) : g.kind === 'CHS' ? P.polyCHS(g) : P.polyRHS(g);
+  const pts = g.kind === 'I' ? P.polygon(g) : g.kind === 'CC' ? P.polyCC(g) : g.kind === 'U' ? P.polyU(g) : g.kind === 'L' ? P.polyL(g) : g.kind === 'CHS' ? P.polyCHS(g) : P.polyRHS(g);
   const rings = isRings(pts) ? pts : [pts];
   const I0 = P.integrals(rings, 0, 0);
   const A = I0.A, zc = I0.Sz / A, yc = I0.Sy / A;
   const I = P.integrals(rings, zc, yc);
   const Iy = I.Iyy, Iz = I.Izz, Iyz = I.Iyz;
   const zt = g.h - zc, zb = zc;
-  const ymin = Math.min(...rings[0].map(p => p[0])), ymax = Math.max(...rings[0].map(p => p[0]));
+  const ymin = Math.min(...rings.map(r => Math.min(...r.map(p => p[0])))), ymax = Math.max(...rings.map(r => Math.max(...r.map(p => p[0]))));
   // oś obojętna plastyczna (pole poniżej = A/2)
   let lo = 0, hi = g.h;
   for (let k = 0; k < 60; k++) { const m = (lo + hi) / 2; const Ab = P.integrals(P.clip(rings, m, false), 0).A; if (Ab < A / 2) lo = m; else hi = m; }
@@ -263,7 +312,7 @@ P.props = function (d) {
   const Wply = up.Sz - dn.Sz;
   let ylo = ymin, yhi = ymax;
   for (let k = 0; k < 60; k++) { const m = (ylo + yhi) / 2; const Ar = P.integrals(P.clipY(rings, m), 0).A; if (Ar > A / 2) ylo = m; else yhi = m; }
-  const ypl = (ylo + yhi) / 2;
+  const ypl = g.kind === 'CC' ? 0 : (ylo + yhi) / 2;   // przekrój dwugałęziowy: oś w środku przerwy między gałęziami
   const rt = P.integrals(P.clipY(rings, ypl), 0, ypl), Wplz = 2 * rt.Sy;
   const o = Object.assign({}, g, { pts: rings[0], rings, A, zc, yc, Iy, Iz, Iyz, zt, zb, ymin, ymax, zpl, Wpl_y: Wply, Wpl_z: Wplz });
   o.Wel_t = Iy / zt; o.Wel_b = Iy / zb; o.Wel_y = Iy / Math.max(zt, zb);
@@ -312,6 +361,32 @@ P.props = function (d) {
     o.thick = [{ n: 'półki', t: tf, z: 'top' }, { n: 'środnik', t: tw, z: 'web' }];
     o.uwagi.push(`Ceownik: środek ścinania leży poza środnikiem (e = ${U.fmt(o.eSC, 1)} mm od środka ciężkości) – obciążenie przyłożone w płaszczyźnie środnika wywołuje skręcanie, którego program nie analizuje; przyjęto obciążenie przez środek ścinania lub skręcanie zablokowane (np. przez przekrycie).`);
     o.opis = `${g.nazwa}: h = ${U.fmt(h, 0)} mm, b = ${U.fmt(b, 0)} mm, t<sub>w</sub> = ${U.fmt(tw, 1)} mm, t<sub>f</sub> = ${U.fmt(tf, 1)} mm${g.slope ? ` (w połowie półki, zbieżność ${U.fmt(g.slope * 100, 0)}%)` : ''}, r = ${U.fmt(r, 1)} mm`;
+  } else if (g.kind === 'CC') {
+    const { h, tw, tf, r } = g, pc = g.pc, hw = h - 2 * tf;
+    const It = 2 * pc.It;
+    const Iw = Iz * (h - tf) * (h - tf) / 4;                // jak dla przekroju bisymetrycznego o pasach z czterech półek (przybliżenie)
+    Object.assign(o, { It, Iw, zs: zc, z0: 0, ys: 0, nWeb: 2, hw, hs: h - tf, Avz: 2 * pc.Avz, Avy: 2 * pc.Avy, Aw: 2 * hw * tw, Af: 2 * g.ch.b * tf });
+    o.A_ch = pc.A; o.I_ch = pc.Iz; o.i_ch = Math.sqrt(pc.Iz / pc.A); o.Iy_ch = pc.Iy; o.iy_ch = Math.sqrt(pc.Iy / pc.A);
+    o.Wel_z_ch = pc.Wel_z; o.Wpl_z_ch = pc.Wpl_z; o.Wel_y_ch = pc.Wel_y; o.Wpl_y_ch = pc.Wpl_y; o.It_ch = pc.It;
+    o.yWeb = g.uklad === 'wew' ? g.B / 2 - tw / 2 : g.a / 2 + tw / 2;     // oś środnika gałęzi (|y|)
+    o.c_fg = o.c_fd = g.ch.b - tw - r; o.c_w = h - 2 * tf - 2 * r;
+    // półki: grzbiet (przy środniku) i krawędź swobodna – w obu gałęziach (do klasyfikacji przy M_z)
+    const roots = g.uklad === 'wew' ? [-g.B / 2 + tw, g.B / 2 - tw] : [-g.a / 2 - tw, g.a / 2 + tw];
+    const tips = g.uklad === 'wew' ? [-g.B / 2 + g.ch.b, g.B / 2 - g.ch.b] : [-g.a / 2 - g.ch.b, g.a / 2 + g.ch.b];
+    o.parts = [
+      { n: 'półki (+z)', typ: 'wsp', c: o.c_fg, t: tf, side: 'top', z: h - tf / 2, roots, tips },
+      { n: 'półki (−z)', typ: 'wsp', c: o.c_fd, t: tf, side: 'bot', z: tf / 2, roots, tips },
+      { n: 'środniki', typ: 'wew', c: o.c_w, t: tw, side: 'web', z0: tf + r, z1: h - tf - r }
+    ];
+    o.thick = [{ n: 'półki', t: tf, z: 'top' }, { n: 'środniki', t: tw, z: 'web' }];
+    // przekrój złożony – PN-EN 1993-1-1, 6.4
+    o.Ieff1 = 0.5 * g.h0 * g.h0 * pc.A + 2 * pc.Iz;        // I_1 (tabl. 6.8)
+    o.lim15 = 15 * o.i_ch;                                 // tabl. 6.9 – rozstaw przekładek ≤ 15 i_min
+    if (!g.bu) { o.integral = g.pa <= o.lim15 + 1e-9; if (!o.integral) { o.bu = true; o.buPack = true; o.uwagi.push(`Rozstaw przekładek a = ${U.fmt(g.pa, 0)} mm > 15·i_min = ${U.fmt(o.lim15, 0)} mm (tabl. 6.9) – słup sprawdzany jak pręt z przewiązkami (6.4.4(2)).`); } }
+    else o.integral = false;
+    o.opis = `${g.nazwa}: gałęzie ${g.ch.nazwa} (h = ${U.fmt(h, 0)}, b = ${U.fmt(g.ch.b, 0)}, t<sub>w</sub> = ${U.fmt(tw, 1)}, t<sub>f</sub> = ${U.fmt(tf, 1)} mm), szerokość B = ${U.fmt(g.B, 0)} mm, rozstaw osi gałęzi h<sub>0</sub> = ${U.fmt(g.h0, 1)} mm; ` +
+      (g.bu ? `przewiązki ${U.fmt(g.pb, 0)} × ${U.fmt(g.pt, 0)} mm co a = ${U.fmt(g.pa, 0)} mm (dwie płaszczyzny), zakład c = ${U.fmt(g.pz, 0)} mm, spoiny a = ${U.fmt(g.pw, 0)} mm` : `przekładki t = ${U.fmt(g.a, 0)} mm co a = ${U.fmt(g.pa, 0)} mm`);
+    if (g.bu) o.uwagi.push('Słup złożony z przewiązkami: wyboczenie względem osi niematerialnej z–z sprawdzane wg 6.4 (siła w gałęzi N_ch,Ed, I_eff, S_v); zwichrzenie i wyboczenie skrętne – pominięte (przekrój dwugałęziowy usztywniony przewiązkami).');
   } else if (g.kind === 'L') {
     const { h, b, t } = g;
     const It = (h + b - t) * t ** 3 / 3;

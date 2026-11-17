@@ -34,7 +34,8 @@ PB.components = function (st, sec, base, ndp) {
   if (kind === 'CHS' && o.typ === 'sztywna') warn.push('Podstawa utwierdzona rury okrągłej – poza zakresem metody składnikowej programu; sprawdzono nośność na ściskanie, ścinanie i docisk (podstawa traktowana jako przegubowa).');
   const fixed = o.typ === 'sztywna' && kind !== 'CHS';
   const h = sec.h, b = kind === 'I' ? Math.max(sec.bg, sec.bd) : sec.b;
-  const tf = kind === 'I' ? Math.max(sec.tg, sec.td) : sec.t, tw = kind === 'I' ? sec.tw : sec.t;
+  const tf = kind === 'I' ? Math.max(sec.tg, sec.td) : kind === 'CC' ? sec.tf : sec.t, tw = kind === 'I' || kind === 'CC' ? sec.tw : sec.t;
+  if (kind === 'CC' && sec.bu) warn.push('Podstawa słupa złożonego z przewiązkami – przyjęto wspólną blachę pod obiema gałęziami (strefy docisku pod półkami i środnikami gałęzi); przy dużym rozstawie gałęzi rozważ osobne blachy / trawersy.');
   if (lp < h + 20 || bp < b + 20) err.push(`Podstawa: blacha ${U.fmt(lp, 0)} × ${U.fmt(bp, 0)} mm za mała dla przekroju ${U.fmt(h, 0)} × ${U.fmt(b, 0)} mm (minimum o 10 mm z każdej strony).`);
   // stal blachy
   const gat = o.gat || 'S235';
@@ -61,10 +62,11 @@ PB.components = function (st, sec, base, ndp) {
     Aeff = Math.PI * (Ro * Ro - Ri * Ri);
     Tf = { beff: sec.t + Math.min(c, extZ) + Math.min(c, sec.D / 2 - sec.t), leff: Math.PI * sec.D, A: Aeff / 2, zC: (sec.D - sec.t) / 2 };
   } else {
-    const beffF = tf + cz + Math.min(c, (h - 2 * tf) / 2), leffF = b + 2 * cy;
+    const beffF = tf + cz + Math.min(c, (h - 2 * tf) / 2);
+    const leffF = kind === 'CC' ? Math.min(b + 2 * cy, sec.uklad === 'plecy' ? b + 2 * cy : 2 * (sec.ch.b + 2 * c)) : b + 2 * cy;   // dwa ceowniki rozstawione – strefy pod półkami gałęzi
     Tf = { beff: beffF, leff: leffF, A: beffF * leffF, zC: h / 2 - tf / 2 };
     const hClear = Math.max(0, h - 2 * tf - 2 * c);
-    const bw = kind === 'I' ? tw + 2 * c : 2 * (tw + 2 * c);                  // rura – dwie ścianki boczne
+    const bw = kind === 'I' ? tw + 2 * c : kind === 'CC' && sec.uklad === 'plecy' ? 2 * tw + sec.a + 2 * c : 2 * (tw + 2 * c);   // rura i dwa ceowniki – dwie ścianki
     Tw = { beff: Math.min(bw, kind === 'I' ? b : b + 2 * cy), leff: hClear, A: Math.min(bw, kind === 'I' ? b : b + 2 * cy) * hClear };
     if (kind === 'RHS' && b - 2 * tf - 2 * c <= 0) { Tw = { beff: b + 2 * cy, leff: hClear, A: (b + 2 * cy) * hClear }; }
     Aeff = 2 * Tf.A + Tw.A;
@@ -132,8 +134,8 @@ PB.components = function (st, sec, base, ndp) {
   const fuW = Math.min(M.STAL[(st.material || {}).gatunek] ? M.fy(st.material.gatunek, sec.tMax, ndp.fySrc).fu : 360, fuP);
   const bw = M.betaW((st.material || {}).gatunek || 'S235');
   const fvwd = fuW / s3 / (bw * g2);
-  const lwf = kind === 'I' ? 2 * b - tw : kind === 'RHS' ? b : Math.PI * sec.D / 2;   // długość spoin jednego pasa (obie strony pasa)
-  const lww = kind === 'I' ? 2 * (h - 2 * tf) : kind === 'RHS' ? 2 * h : Math.PI * sec.D / 2;
+  const lwf = kind === 'I' ? 2 * b - tw : kind === 'RHS' ? b : kind === 'CC' ? 2 * (2 * sec.ch.b - tw) : Math.PI * sec.D / 2;   // długość spoin jednego pasa (obie strony pasa)
+  const lww = kind === 'I' ? 2 * (h - 2 * tf) : kind === 'RHS' ? 2 * h : kind === 'CC' ? (sec.uklad === 'plecy' ? 2 : 4) * (h - 2 * tf) : Math.PI * sec.D / 2;
   // sztywność (6.3.4) – tylko podstawa utwierdzona
   let stiff = null;
   if (fixed && Tt && !Tt.inner) {
@@ -185,7 +187,7 @@ PB.check = function (C, f, ndp, sec) {
     o.mjy = ry; o.uMy = ry ? My / ry.Mj : 0;
     if (Mz > 1) {
       // M_z – model uproszczony (przybliżenie): rozciągane 2 kotwy po stronie +y (po jednej w rzędzie), ściskanie pod krawędziami pasów po stronie −y
-      const tfz = C.kind === 'I' ? C.tf : C.t;
+      const tfz = C.tf;
       const ccz = Math.min(C.c, C.extY);
       const FCz = Math.min(C.fjd * 2 * (tfz + 2 * Math.min(C.c, C.extZ)) * (ccz + Math.min(C.c, C.b / 2)), C.FcfcRdZ || Infinity);
       const my = Math.max(1, (C.w - C.b) / 2 - 0.8 * C.af * Math.SQRT2);
@@ -213,7 +215,7 @@ PB.check = function (C, f, ndp, sec) {
   o.Ft1 = Ft1; o.Fv1 = Fv1;
   o.uTV = (C.kotwyScin ? Fv1 / C.F2vb : 0) + Ft1 / (1.4 * C.FtRd);
   // spoiny – metoda uproszczona: siła w pasie F_f = M_y/(h − t_f) ± N·A_f/A; środnik – ścinanie V_z
-  const Af = C.kind === 'I' ? C.b * C.tf : C.kind === 'RHS' ? C.b * C.t : sec.A / 2;
+  const Af = C.kind === 'I' ? C.b * C.tf : C.kind === 'RHS' ? C.b * C.tf : C.kind === 'CC' ? 2 * sec.ch.b * sec.tf : sec.A / 2;
   const Ff1 = Math.abs(o.My) / Math.max(1, C.h - C.tf) + Math.abs(f.N) * Af / sec.A;
   const fvy = Math.abs(o.Vy) / (2 * C.af * C.lwf);
   const fw = Math.hypot(Ff1 / (C.af * C.lwf), fvy);

@@ -128,7 +128,7 @@ V.elev = function (el) { BS.W3.render(el); };
 /* ================================================================ PODSTAWA */
 V.base = function (el) {
   const r = R(), st = S();
-  let h = head(el, 'Podstawa słupa (PN-EN 1993-1-8)', 'metoda składnikowa; kliknij wiersz – tok obliczeń');
+  let h = head(el, 'Podstawa słupa (PN-EN 1993-1-8)', 'metoda składnikowa; rysunek: kliknij element – parametry, wymiar – zmiana na rysunku; wiersz – tok obliczeń');
   if (!st.podstawa.aktywna) { el.innerHTML = h + '<div class="msg">Podstawa nie jest projektowana – włącz w grupie „Podstawa słupa”.</div><button class="btn pri" id="pbOn" type="button">Projektuj podstawę</button>'; bindHead(el); $('#pbOn', el).onclick = () => { st.podstawa.aktywna = true; A.changed(true); }; return; }
   if (!r || !r.pb || !r.pb.C) { el.innerHTML = h + errBox(); bindHead(el); return; }
   const C = r.pb.C;
@@ -143,6 +143,7 @@ V.base = function (el) {
   }
   h += `<h4 style="margin-top:12px">Sprawdzenia podstawy</h4>${tableChecks(r.checks.filter(c => /^Podstawa/.test(c.grp) || c.id === 'KRP'))}`;
   el.innerHTML = h; bindHead(el); bindChecks(el);
+  A.bindBaseFig(el, false);
   $$('[data-act]', el).forEach(bt => bt.addEventListener('click', () => A.doAct(bt.dataset.act)));
   const d = $('#pbDes', el); if (d) d.onclick = () => A.runDesign('base');
 };

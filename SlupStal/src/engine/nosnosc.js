@@ -102,7 +102,7 @@ R.classCol = function (sec, fy, Nc, My, Mz, epsF) {
   const pw = sec.parts.find(p => p.side === 'web');
   if (pw) {
     const c = pw.z1 - pw.z0, ct = pw.c / pw.t;
-    const yW = sec.kind === 'RHS' ? (Mzz >= 0 ? sec.b / 2 - sec.t / 2 : -sec.b / 2 + sec.t / 2) : 0;
+    const yW = sec.kind === 'RHS' ? (Mzz >= 0 ? sec.b / 2 - sec.t / 2 : -sec.b / 2 + sec.t / 2) : sec.kind === 'CC' ? (Mzz >= 0 ? sec.yWeb : -sec.yWeb) : 0;
     const sT = sig(yW, pw.z1), sB = sig(yW, pw.z0), smax = Math.max(sT, sB), smin = Math.min(sT, sB);
     if (smax <= 0) out.all.push({ n: pw.n, typ: 'wewnętrzna', c: pw.c, t: pw.t, ct, alpha: 0, psi: -Infinity, lim: [Infinity, Infinity, Infinity], cls: 1, tension: true, ref: 'tabl. 5.2 (ark. 1)' });
     else {
@@ -113,7 +113,7 @@ R.classCol = function (sec, fy, Nc, My, Mz, epsF) {
         alpha = U.clamp(Myy >= 0 ? (pw.z1 - zp) / c : (zp - pw.z0) / c, 0, 1);
       }
       const aEl = smin >= 0 ? 1 : smax / (smax - smin);
-      if (sec.kind === 'RHS' && hasMz) alpha = Math.max(alpha, aEl);
+      if ((sec.kind === 'RHS' || sec.kind === 'CC') && hasMz) alpha = Math.max(alpha, aEl);
       const ps = smin / smax, k = internalClass(ct, eps, alpha, ps);
       out.all.push({ n: pw.n, typ: 'wewnętrzna', c: pw.c, t: pw.t, ct, alpha, psi: ps, lim: k.lim, cls: k.cls, ref: 'tabl. 5.2 (ark. 1)' });
       out.alpha = alpha;
@@ -122,6 +122,18 @@ R.classCol = function (sec, fy, Nc, My, Mz, epsF) {
   // ---- ścianki poziome (pasy dwuteownika – wspornikowe; ścianki ±z rury – wewnętrzne z gradientem od M_z)
   sec.parts.filter(p => p.side === 'top' || p.side === 'bot').forEach(p => {
     const ct = p.c / p.t;
+    if (sec.kind === 'CC') {
+      // półki ceowników (wspornikowe) – w obu gałęziach; miarodajna bardziej ściskana (gradient od M_z wzdłuż y)
+      let worst = null;
+      p.roots.forEach((yr, j) => {
+        const sRoot = sig(yr, p.z), sTip = sig(p.tips[j], p.z);
+        let alpha = 1; if (sRoot <= 0 && sTip > 0) alpha = sTip / (sTip - sRoot); else if (sTip <= 0 && sRoot > 0) alpha = sRoot / (sRoot - sTip);
+        const k = outstandClass(ct, eps, sTip, sRoot, alpha);
+        if (!worst || k.cls > worst.k.cls || (k.cls === worst.k.cls && Math.max(sTip, sRoot) > worst.sm)) worst = { k, alpha, sm: Math.max(sTip, sRoot) };
+      });
+      out.all.push({ n: p.n, typ: 'wspornikowa', c: p.c, t: p.t, ct, alpha: worst.alpha, lim: worst.k.lim, cls: worst.k.cls, tension: !!worst.k.tension, ref: 'tabl. 5.2 (ark. 2)', opis: worst.k.opis });
+      return;
+    }
     if (sec.kind === 'I') {
       const half = (p.bw || sec.b) / 2, sRoot = sig(0, p.z), sTipP = sig(half, p.z), sTipM = sig(-half, p.z);
       const sTip = Math.max(sTipP, sTipM);
@@ -159,6 +171,7 @@ const kSigInternal = (psi) => (psi >= 1 ? 4 : psi > 0 ? 8.2 / (1.05 + psi) : psi
 // mode: 'Mpos' | 'Mneg' | 'N' – zwraca prostokąty efektywne i charakterystyki
 R.effective = function (sec, fy, mode) {
   if (sec.kind === 'L' || sec.kind === 'U') throw new Error('Przekrój efektywny tego kształtu nie jest obsługiwany.');
+  if (sec.kind === 'CC') throw new Error('Słup z dwóch ceowników klasy 4 – poza zakresem programu; dobierz ceownik o grubszych ściankach.');
   if (sec.kind === 'CHS') throw new Error('Rura okrągła klasy 4 (d/t > 90ε²) – nośność wg PN-EN 1993-1-6 poza zakresem programu; dobierz grubszą ściankę.');
   const eps = Math.sqrt(235 / fy);
   let rects = P.rects(sec);
@@ -244,6 +257,14 @@ R.effectiveZ = function (sec, fy) {
 
 /* nośność plastyczna przy zginaniu ze siłą osiową (przekrój dowolny – numerycznie): MN,y,Rd */
 R.MNpl = function (sec, fy, Nc, Mpos, g0) {
+  if (!sec._mnp) Object.defineProperty(sec, '_mnp', { value: new Map(), enumerable: false });
+  const key = (Mpos ? 'p' : 'n') + Math.round(Nc / (sec.A * fy) * 2000) + '|' + fy + '|' + g0;
+  if (sec._mnp.has(key)) return sec._mnp.get(key);
+  const v = R.MNpl0(sec, fy, Math.round(Nc / (sec.A * fy) * 2000) / 2000 * sec.A * fy, Mpos, g0);
+  if (sec._mnp.size < 20000) sec._mnp.set(key, v);
+  return v;
+};
+R.MNpl0 = function (sec, fy, Nc, Mpos, g0) {
   // oś obojętna: pole ściskane − pole rozciągane = Nc/fy
   const A = sec.A, Ac = U.clamp((A + Nc / fy) / 2, 0, A);
   let lo = 0, hi = sec.h;
@@ -260,6 +281,28 @@ R.MNpl = function (sec, fy, Nc, Mpos, g0) {
   return Math.abs(M) / g0;
 };
 
+
+/* nośność plastyczna przy zginaniu M_z ze siłą osiową (numerycznie, oś obojętna w kierunku y): MN,z,Rd */
+R.MNplZ = function (sec, fy, Nc, g0) {
+  if (!sec._mnz) Object.defineProperty(sec, '_mnz', { value: new Map(), enumerable: false });
+  const q = Math.round(Nc / (sec.A * fy) * 2000), key = q + '|' + fy + '|' + g0;
+  if (sec._mnz.has(key)) return sec._mnz.get(key);
+  const v = R.MNplZ0(sec, fy, q / 2000 * sec.A * fy, g0);
+  if (sec._mnz.size < 20000) sec._mnz.set(key, v);
+  return v;
+};
+R.MNplZ0 = function (sec, fy, Nc, g0) {
+  const A = sec.A, Ac = U.clamp((A + Nc / fy) / 2, 0, A);
+  let yp;
+  if (sec.kind === 'CC' && Math.abs(Ac - A / 2) < 1e-6 * A) yp = 0;
+  else {
+    let lo = sec.ymin, hi = sec.ymax;
+    for (let k = 0; k < 60; k++) { const m = (lo + hi) / 2; const a = P.integrals(P.clipY(sec.rings, m), 0).A; if (a > Ac) lo = m; else hi = m; }
+    yp = (lo + hi) / 2;
+  }
+  const rt = P.integrals(P.clipY(sec.rings, yp), sec.zc, sec.yc || 0);
+  return Math.abs(2 * fy * rt.Sy) / g0;
+};
 
 /* ---------------------------------------------------------- nośności podstawowe */
 R.basic = function (sec, mat, ndp) {
@@ -332,6 +375,7 @@ R.atPoint = function (sec, b, ndp, e, c) {
     if (rz > 0) {
       if (sec.kind === 'I') Mply = Math.min(Mply, (sec.Wpl_y - rz * sec.Aw * sec.Aw / (4 * sec.tw)) * fy / g0);
       else if (sec.kind === 'RHS') Mply = Math.min(Mply, (sec.Wpl_y - rz * sec.Aw * sec.Aw / (4 * 2 * sec.t)) * fy / g0);
+      else if (sec.kind === 'CC') Mply = Math.min(Mply, (sec.Wpl_y - rz * sec.Aw * sec.Aw / (4 * 2 * sec.tw)) * fy / g0);
       else Mply = Mply * (1 - rz);
     }
     if (ry > 0) Mplz = sec.kind === 'CHS' ? Mplz * (1 - ry) : Mplz * (1 - ry);
@@ -353,6 +397,12 @@ R.atPoint = function (sec, b, ndp, e, c) {
       MNy = Math.min(Mply, Mply * (1 - n) / (1 - 0.5 * aw)); MNz = Math.min(Mplz, Mplz * (1 - n) / (1 - 0.5 * af));
       al = be = n < 0.8 ? Math.min(6, 1.66 / (1 - 1.13 * n * n)) : 6;
       f = '6.39, 6.40';
+    } else if (sec.kind === 'CC') {
+      // dwa ceowniki – M_N,Rd liczone numerycznie (plastyczny rozkład naprężeń przy N), interakcja dwukierunkowa z α = β = 1 (6.41, bezpiecznie)
+      MNy = n <= 1e-6 ? Mply : Math.min(Mply, R.MNpl(sec, fy, N, (e.My || 0) >= 0, g0) * Mply / b.Mply);
+      MNz = n <= 1e-6 ? Mplz : Math.min(Mplz, R.MNplZ(sec, fy, N, g0) * Mplz / b.Mplz);
+      al = be = 1;
+      f = '6.2.9.1 – M_N,Rd z plastycznego rozkładu naprężeń; 6.41 z α = β = 1';
     } else {
       MNy = MNz = Mply * Math.max(0, 1 - Math.pow(n, 1.7));
       al = be = 2;

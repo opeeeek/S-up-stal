@@ -44,11 +44,23 @@ D.section = function (sec, o) {
   const bmax = sec.ymax - sec.ymin;
   const sc = (S0 - 2 * pad) / Math.max(sec.h, bmax);
   const wSig = o.sigma ? 160 : 0;
-  const W = bmax * sc + 2 * pad + 50 + wSig, H = sec.h * sc + 2 * pad + 18;
-  const cx = pad + 26 - sec.ymin * sc, X = (y) => cx + y * sc, Y = (z) => H - pad - z * sc;
+  const ccPt = sec.kind === 'CC' ? Math.max(3, (sec.bu && !sec.buPack ? sec.pt : 0)) : 0;
+  const W = bmax * sc + 2 * pad + 50 + wSig, H = sec.h * sc + 2 * pad + 18 + (sec.kind === 'CC' ? 24 : 0);
+  const cx = pad + 26 - sec.ymin * sc, X = (y) => cx + y * sc, Y = (z) => H - pad - (sec.kind === 'CC' ? 14 : 0) - z * sc;
   let g = '';
   const path = sec.rings.map(r => r.map((p, i) => (i ? 'L' : 'M') + X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join(' ') + ' Z').join(' ');
   g += `<path d="${path}" fill="${C.steel}" fill-rule="evenodd" stroke="${C.ink}" stroke-width="1.2"/>`;
+  // słup z dwóch ceowników: przewiązki (w płaszczyznach półek) / przekładka między grzbietami
+  if (sec.kind === 'CC') {
+    if (sec.bu && !sec.buPack) {
+      const yb = sec.h0 / 2 + (sec.pz || 40) / 2;
+      [[sec.h, sec.h + sec.pt], [-sec.pt, 0]].forEach(([z0, z1]) => { g += `<rect class="ccbat" x="${X(-yb)}" y="${Y(z1)}" width="${2 * yb * sc}" height="${Math.max(2, (z1 - z0) * sc)}" fill="#c9d3e3" stroke="${C.ink}" stroke-width="0.8" stroke-dasharray="4 2"/>`; });
+    } else if (sec.uklad === 'plecy') g += `<rect x="${X(-sec.a / 2)}" y="${Y(sec.h * 0.8)}" width="${sec.a * sc}" height="${sec.h * 0.6 * sc}" fill="#c9d3e3" stroke="${C.ink}" stroke-width="0.8" stroke-dasharray="4 2"/>`;
+    // osie gałęzi i rozstaw h0
+    [-1, 1].forEach(sg => { g += `<line x1="${X(sg * sec.h0 / 2)}" y1="${Y(sec.h) - 6}" x2="${X(sg * sec.h0 / 2)}" y2="${Y(0) + 6}" stroke="${C.vio}" stroke-dasharray="3 3" stroke-width="0.7"/>`; });
+    g += dimH(X(-sec.h0 / 2), X(sec.h0 / 2), Y(0) + 16, `h<tspan baseline-shift="sub" font-size="75%">0</tspan> = ${fmt(sec.h0, 1)}`, { below: true });
+    g += dimH(X(sec.ymin), X(sec.ymax), Y(sec.h) - 12 - (sec.bu && !sec.buPack ? sec.pt * sc : 0), `B = ${fmt(sec.B, 0)}`);
+  }
   // części nieefektywne (klasa 4)
   const eff = o.eff;
   if (eff && eff.info) eff.info.forEach(inf => {
@@ -71,7 +83,8 @@ D.section = function (sec, o) {
   if (sec.kind === 'I') {
     g += tx(X(sec.tw / 2) + 4, Y(sec.h * 0.42), `t<tspan font-size="8" dy="2">w</tspan><tspan dy="-2"> = ${fmt(sec.tw, 1)}</tspan>`, { a: 'start', fs: 10, c: '#3d4656' });
     g += tx(X(sec.bg / 2) + 4, Y(sec.h - sec.tg / 2) + 3, `t<tspan font-size="8" dy="2">f</tspan><tspan dy="-2"> = ${fmt(sec.tg, 1)}</tspan>`, { a: 'start', fs: 10, c: '#3d4656' });
-  } else g += tx(X(sec.ymax) + 4, Y(sec.h * 0.25), `t = ${fmt(sec.t, 1)}`, { a: 'start', fs: 10, c: '#3d4656' });
+  } else if (sec.kind === 'CC') g += tx(X(sec.ymax) + 4, Y(sec.h * 0.25), `t_w = ${fmt(sec.tw, 1)}, t_f = ${fmt(sec.tf, 1)}`.replace(/_(\w)/g, '<tspan font-size="8" dy="2">$1</tspan><tspan dy="-2"></tspan>'), { a: 'start', fs: 10, c: '#3d4656' });
+  else g += tx(X(sec.ymax) + 4, Y(sec.h * 0.25), `t = ${fmt(sec.t, 1)}`, { a: 'start', fs: 10, c: '#3d4656' });
   // +z / −z
   g += tx(X(sec.ymin) - 2, Y(sec.h) + 4, '+z', { a: 'end', fs: 9, c: C.mut }) + tx(X(sec.ymin) - 2, Y(0) - 1, '−z', { a: 'end', fs: 9, c: C.mut });
   if (o.zones) {
@@ -80,6 +93,12 @@ D.section = function (sec, o) {
       g += zone('fg', X(-sec.bg / 2) - 3, X(sec.bg / 2) + 3, Y(sec.h) - 3, Y(sec.h - sec.tg) + 2, `Pas (+z) ${fmt(sec.bg, 0)}×${fmt(sec.tg, 1)} – kliknij, aby zmienić (seria, kształtownik lub wymiary)`);
       g += zone('fd', X(-sec.bd / 2) - 3, X(sec.bd / 2) + 3, Y(sec.td) - 2, Y(0) + 3, `Pas (−z) ${fmt(sec.bd, 0)}×${fmt(sec.td, 1)} – kliknij, aby zmienić`);
       g += zone('w', X(-sec.tw / 2) - 7, X(sec.tw / 2) + 7, Y(sec.h - sec.tg) + 2, Y(sec.td) - 2, `Środnik t_w = ${fmt(sec.tw, 1)} – kliknij, aby zmienić`);
+    } else if (sec.kind === 'CC') {
+      const half = sec.uklad === 'wew' ? sec.ch.b : sec.ch.b + sec.tw;
+      g += zone('all', X(sec.ymin) - 3, X(sec.ymin + half) + 3, Y(sec.h) + 2, Y(0) - 2, `Gałąź ${sec.ch.nazwa} – kliknij: ceownik, układ, rozstaw`);
+      g += zone('all', X(sec.ymax - half) - 3, X(sec.ymax) + 3, Y(sec.h) + 2, Y(0) - 2, `Gałąź ${sec.ch.nazwa} – kliknij: ceownik, układ, rozstaw`);
+      if (sec.bu && !sec.buPack) g += zone('bat', X(-sec.h0 / 2), X(sec.h0 / 2), Y(sec.h + sec.pt) - 4, Y(sec.h) + 4, `Przewiązki ${fmt(sec.pb, 0)}×${fmt(sec.pt, 0)} co ${fmt(sec.pa, 0)} mm – kliknij, aby zmienić`) + zone('bat', X(-sec.h0 / 2), X(sec.h0 / 2), Y(0) - 4, Y(-sec.pt) + 4, 'Przewiązki – kliknij, aby zmienić');
+      else g += zone('bat', X(-sec.a / 2) - 4, X(sec.a / 2) + 4, Y(sec.h * 0.8), Y(sec.h * 0.2), `Przekładki co ${fmt(sec.pa, 0)} mm – kliknij, aby zmienić`);
     } else g += zone('all', X(sec.ymin) - 3, X(sec.ymax) + 3, Y(sec.h) - 3, Y(0) + 3, 'Przekrój – kliknij, aby zmienić');
   }
   if (o.sigma) {
@@ -235,24 +254,26 @@ D.scheme = function (St, R, pl, o) {
   s += tx(8, 16, pl === 'y' ? 'Płaszczyzna x–z – zginanie M<tspan baseline-shift="sub" font-size="75%">y</tspan>' : 'Płaszczyzna x–y – zginanie M<tspan baseline-shift="sub" font-size="75%">z</tspan>', { fs: 11.5, w: 650, a: 'start' });
   s += tx(8, 30, `wyboczenie względem osi ${pl}–${pl}; obciążenia w kierunku ${kier}`, { fs: 9.5, a: 'start', c: C.ink2 });
   // słup
-  s += `<g class="schcol" data-col="${pl}" style="cursor:pointer"><title>Lewy przycisk – przekrój; dwuklik – dodaj obciążenie w tym miejscu; prawy – menu</title><rect x="${cx - cw / 2}" y="${Y(Hmm)}" width="${cw}" height="${hh}" fill="${o.sel ? '#dbe7fb' : C.steel}" stroke="${C.ink}" stroke-width="1.2"/></g>`;
+  s += `<g class="schcol" data-col="${pl}" style="cursor:pointer"><title>Lewy przycisk – zaznacz słup; dwuklik – obciążenie na tej wysokości; prawy – menu</title><rect x="${cx - cw / 2}" y="${Y(Hmm)}" width="${cw}" height="${hh}" fill="${o.sel ? '#dbe7fb' : C.steel}" stroke="${C.ink}" stroke-width="1.2"/></g>`;
   // podpory
-  let sup = '';
+  let sup = '', supT = '';
   const springSym = (x, y) => `<path d="M${x},${y} l0,4 l-5,3 l10,3 l-10,3 l5,3 l0,4" fill="none" stroke="${C.ink}" stroke-width="1"/>`;
   if (dl === 'utw') sup += hatch(cx, Y(0), cw + 30, 1);
   else { sup += `<path d="M${cx},${Y(0)} l-9,13 h18 z" fill="#ffffff" stroke="${C.ink}" stroke-width="1.3"/>` + hatch(cx, Y(0) + 13 + (dl === 'spr' ? 20 : 0), 30, 1); if (dl === 'spr') sup += springSym(cx, Y(0) + 13) + tx(cx + 18, Y(0) + 26, `k = ${fmt(U.num(pl === 'y' ? bc.dol.kry : bc.dol.krz), 0)} kNm/rad`, { fs: 8.5, a: 'start', c: C.mut }); }
   const yT = Y(Hmm);
-  if (gr === 'prz') sup += `<line x1="${cx + cw / 2}" y1="${yT + 4}" x2="${cx + cw / 2 + 26}" y2="${yT + 4}" stroke="${C.ink}" stroke-width="1.4"/><circle cx="${cx + cw / 2 + 2}" cy="${yT + 4}" r="2.4" fill="#fff" stroke="${C.ink}"/><circle cx="${cx + cw / 2 + 24}" cy="${yT + 4}" r="2.4" fill="#fff" stroke="${C.ink}"/>` + hatchV(cx + cw / 2 + 27, yT + 4, 22, 1) + tx(cx + cw / 2 + 36, yT - 8, 'przegub nieprzesuwny', { fs: 8.5, a: 'start', c: C.mut });
-  else if (gr === 'utw') sup += hatch(cx, yT, cw + 30, -1) + tx(cx + cw / 2 + 18, yT - 10, 'utwierdzenie', { fs: 8.5, a: 'start', c: C.mut });
-  else if (gr === 'utwp') sup += hatch(cx, yT - 8, cw + 30, -1) + `<circle cx="${cx - 7}" cy="${yT - 4}" r="3" fill="none" stroke="${C.ink}"/><circle cx="${cx + 7}" cy="${yT - 4}" r="3" fill="none" stroke="${C.ink}"/>` + tx(cx + cw / 2 + 18, yT - 10, 'utwierdzenie przesuwne', { fs: 8.5, a: 'start', c: C.mut });
-  else if (gr === 'spr') sup += `<path d="M${cx + cw / 2},${yT + 4} l6,0 l3,-5 l3,10 l3,-10 l3,10 l3,-5 l6,0" fill="none" stroke="${C.ink}"/>` + hatchV(cx + cw / 2 + 28, yT + 4, 22, 1) + tx(cx + cw / 2 + 36, yT - 8, `sprężyna k = ${fmt(U.num(pl === 'y' ? bc.gora.khz : bc.gora.khy), 0)} kN/m`, { fs: 8.5, a: 'start', c: C.mut });
-  else sup += tx(cx + cw / 2 + 6, yT + 12, 'swobodny', { fs: 8.5, a: 'start', c: C.mut });
-  s += `<g class="supp" data-sup="${pl}" style="cursor:pointer"><title>Warunki podparcia – kliknij, aby zmienić</title>${sup}<rect x="${cx - 40}" y="${yT - 24}" width="110" height="26" fill="transparent"/><rect x="${cx - 40}" y="${Y(0)}" width="80" height="34" fill="transparent"/></g>`;
+  if (gr === 'prz') supT += `<line x1="${cx + cw / 2}" y1="${yT + 4}" x2="${cx + cw / 2 + 26}" y2="${yT + 4}" stroke="${C.ink}" stroke-width="1.4"/><circle cx="${cx + cw / 2 + 2}" cy="${yT + 4}" r="2.4" fill="#fff" stroke="${C.ink}"/><circle cx="${cx + cw / 2 + 24}" cy="${yT + 4}" r="2.4" fill="#fff" stroke="${C.ink}"/>` + hatchV(cx + cw / 2 + 27, yT + 4, 22, 1) + tx(cx + cw / 2 + 36, yT - 8, 'przegub nieprzesuwny', { fs: 8.5, a: 'start', c: C.mut });
+  else if (gr === 'utw') supT += hatch(cx, yT, cw + 30, -1) + tx(cx + cw / 2 + 18, yT - 10, 'utwierdzenie', { fs: 8.5, a: 'start', c: C.mut });
+  else if (gr === 'utwp') supT += hatch(cx, yT - 8, cw + 30, -1) + `<circle cx="${cx - 7}" cy="${yT - 4}" r="3" fill="none" stroke="${C.ink}"/><circle cx="${cx + 7}" cy="${yT - 4}" r="3" fill="none" stroke="${C.ink}"/>` + tx(cx + cw / 2 + 18, yT - 10, 'utwierdzenie przesuwne', { fs: 8.5, a: 'start', c: C.mut });
+  else if (gr === 'spr') supT += `<path d="M${cx + cw / 2},${yT + 4} l6,0 l3,-5 l3,10 l3,-10 l3,10 l3,-5 l6,0" fill="none" stroke="${C.ink}"/>` + hatchV(cx + cw / 2 + 28, yT + 4, 22, 1) + tx(cx + cw / 2 + 36, yT - 8, `sprężyna k = ${fmt(U.num(pl === 'y' ? bc.gora.khz : bc.gora.khy), 0)} kN/m`, { fs: 8.5, a: 'start', c: C.mut });
+  else supT += tx(cx + cw / 2 + 6, yT + 12, 'swobodny', { fs: 8.5, a: 'start', c: C.mut });
+  const dN = { utw: 'utwierdzenie', prz: 'przegub', spr: 'sprężyna obrotowa' }[dl] || dl, gN = { swob: 'swobodny', prz: 'przegub nieprzesuwny', utw: 'utwierdzenie nieprzesuwne', utwp: 'utwierdzenie przesuwne', spr: 'podparcie sprężyste' }[gr] || gr;
+  s += `<g class="supp" data-sup="${pl}" data-end="dol" style="cursor:pointer"><title>Podstawa (${pl === 'y' ? 'x–z' : 'x–y'}): ${dN} – kliknij, aby zaznaczyć; dwuklik lub prawy przycisk – zmiana</title>${sup}<rect x="${cx - 40}" y="${Y(0)}" width="80" height="34" fill="transparent"/></g>`;
+  s += `<g class="supp" data-sup="${pl}" data-end="gora" style="cursor:pointer"><title>Wierzchołek (${pl === 'y' ? 'x–z' : 'x–y'}): ${gN} – kliknij, aby zaznaczyć; dwuklik lub prawy przycisk – zmiana</title>${supT}<rect x="${cx - 40}" y="${yT - 24}" width="110" height="26" fill="transparent"/></g>`;
   // stężenia w płaszczyźnie
   (St.stezenia || []).forEach((z, i) => {
     if (!(z.pl === pl || z.pl === 'yz')) return;
     const y = Y(U.num(z.x) * 1000), x0 = cx - cw / 2;
-    s += `<g class="brace" data-brace="${i}" style="cursor:pointer"><title>Stężenie S${i + 1}: x = ${fmt(U.num(z.x), 2)} m – kliknij, aby zmienić</title><line x1="${x0 - 22}" y1="${y}" x2="${x0}" y2="${y}" stroke="${C.warn}" stroke-width="1.6"/><circle cx="${x0 - 1}" cy="${y}" r="2.2" fill="#fff" stroke="${C.warn}"/><circle cx="${x0 - 21}" cy="${y}" r="2.2" fill="#fff" stroke="${C.warn}"/>${hatchV(x0 - 23, y, 18, -1)}` + tx(x0 - 32, y - 6, `S${i + 1}${z.wys === 'pas+' ? ' (pas +z)' : z.wys === 'pas-' ? ' (pas −z)' : ''}${z.skret ? ' +φ' : ''}`, { fs: 8.5, a: 'end', c: C.warn }) + '</g>';
+    s += `<g class="brace" data-brace="${i}" style="cursor:pointer"><title>Stężenie S${i + 1}: x = ${fmt(U.num(z.x), 2)} m – kliknij – zaznacz; dwuklik – zmień; prawy przycisk – menu</title><line x1="${x0 - 22}" y1="${y}" x2="${x0}" y2="${y}" stroke="${C.warn}" stroke-width="1.6"/><circle cx="${x0 - 1}" cy="${y}" r="2.2" fill="#fff" stroke="${C.warn}"/><circle cx="${x0 - 21}" cy="${y}" r="2.2" fill="#fff" stroke="${C.warn}"/>${hatchV(x0 - 23, y, 18, -1)}` + tx(x0 - 32, y - 6, `S${i + 1}${z.wys === 'pas+' ? ' (pas +z)' : z.wys === 'pas-' ? ' (pas −z)' : ''}${z.skret ? ' +φ' : ''}`, { fs: 8.5, a: 'end', c: C.warn }) + '</g>';
   });
   (St.stezenia || []).forEach((z, i) => { if (z.pl === pl || z.pl === 'yz') return; if (z.skret) { const y = Y(U.num(z.x) * 1000); s += tx(cx - cw / 2 - 4, y + 3, '⟲', { fs: 9, a: 'end', c: C.warn }); } void i; });
   // obciążenia charakterystyczne
@@ -264,7 +285,7 @@ D.scheme = function (St, R, pl, o) {
     if (L.aktywne === false || (on && !on.has(li))) return;
     const col = D.loadColor(L);
     (L.sklad || []).forEach((p, pi) => {
-      const g0 = `<g class="ld" data-li="${li}" data-pi="${pi}" style="cursor:pointer"><title>${esc(L.id)} – ${esc(L.nazwa || '')}: kliknij, aby zmienić</title>`;
+      const g0 = `<g class="ld" data-li="${li}" data-pi="${pi}" style="cursor:pointer"><title>${esc(L.id)} – ${esc(L.nazwa || '')}: kliknij – zaznacz; dwuklik – zmień; prawy przycisk – menu</title>`;
       if (p.typ === 'N') {
         const x = p.x === '' || p.x === undefined ? Hmm : U.num(p.x) * 1000, y = Y(x);
         const e = U.num(pl === 'y' ? p.ez : p.ey, 0);
@@ -317,7 +338,7 @@ D.scheme = function (St, R, pl, o) {
       return g;
     };
     const F = o.F, src = F ? 'kombinacja ' + (o.Flab || '') : 'obwiednia SGN';
-    if (['M', 'V', 'N'].includes(mode)) s += `<rect class="mhit" data-pl="${pl}" x="${cx + cw / 2 + 1}" y="${Y(Hmm)}" width="${Math.max(10, W - cx - cw / 2 - 7)}" height="${hh}" fill="transparent" style="cursor:crosshair"><title>Kliknij – siły i sprawdzenia na tej wysokości</title></rect>`;
+    if (['M', 'V', 'N'].includes(mode)) s += `<rect class="mhit" data-pl="${pl}" x="${cx + cw / 2 + 1}" y="${Y(Hmm)}" width="${Math.max(10, W - cx - cw / 2 - 7)}" height="${hh}" fill="transparent" style="cursor:crosshair"><title>Kliknij – wartości na tej wysokości (znacznik); dwuklik – siły i sprawdzenia; prawy – menu</title></rect>`;
     if (mode === 'M') { const e = pl === 'y' ? r.env.My : r.env.Mz; s += series(F ? [F[pl].M] : [e.max, e.min], pl === 'y' ? C.red : C.vio, 1, 'kNm', 1e6); s += tx(8, H - 38, `M_${pl === 'y' ? 'y' : 'z'},Ed [kNm] – ${src}${r.method !== 'I' ? ' (II rząd)' : ''}`.replace(/_(\w+),Ed/, '<tspan baseline-shift="sub" font-size="75%">$1,Ed</tspan>'), { fs: 9.5, a: 'start', c: C.ink2 }); }
     else if (mode === 'V') { const e = pl === 'y' ? r.env.Vz : r.env.Vy; s += series(F ? [F[pl].V] : [e.max, e.min], C.blu, 1, 'kN', 1e3); s += tx(8, H - 38, `V [kN] – ${src} (siła w kierunku ${kier})`, { fs: 9.5, a: 'start', c: C.ink2 }); }
     else if (mode === 'N') { s += series(F ? [F.N] : [r.env.Nmax, r.env.Nmin], C.grn, 0, 'kN', 1e3); s += tx(8, H - 38, `N_Ed [kN] – ${src} (+ ściskanie)`.replace('_Ed', '<tspan baseline-shift="sub" font-size="75%">Ed</tspan>'), { fs: 9.5, a: 'start', c: C.ink2 }); }
@@ -336,6 +357,13 @@ D.scheme = function (St, R, pl, o) {
     }
   }
   s += ldS;
+  if (o.dims) {
+    const xsD = [0, Hmm];
+    (St.stezenia || []).forEach(z => { if (z.pl === pl || z.pl === 'yz') xsD.push(U.num(z.x) * 1000); });
+    loads.forEach((L, li) => { if (L.aktywne === false) return; (L.sklad || []).forEach(p => { const xx = p.typ === 'q' ? [p.x0, p.x1] : [p.x]; xx.forEach(v => { if (v !== '' && v !== undefined && v !== null) xsD.push(U.num(v) * 1000); }); }); });
+    const xu = Array.from(new Set(xsD.filter(v => v >= 0 && v <= Hmm).map(v => Math.round(v)))).sort((a2, b2) => a2 - b2);
+    if (xu.length > 2) { const xd = cx - cw / 2 - 52; s += `<g class="dimch">`; for (let k = 0; k < xu.length - 1; k++) { const y0 = Y(xu[k]), y1 = Y(xu[k + 1]); s += `<line x1="${xd}" y1="${y0}" x2="${xd}" y2="${y1}" stroke="${C.mut}" stroke-width="0.7"/><line x1="${xd - 3}" y1="${y0 + 3}" x2="${xd + 3}" y2="${y0 - 3}" stroke="${C.mut}"/>` + (y0 - y1 > 14 ? tx(xd - 3, (y0 + y1) / 2, fmt((xu[k + 1] - xu[k]) / 1000, 2), { fs: 8.5, rot: -90, c: C.ink2 }) : ''); } s += `<line x1="${xd - 3}" y1="${Y(Hmm) + 3}" x2="${xd + 3}" y2="${Y(Hmm) - 3}" stroke="${C.mut}"/></g>`; }
+  }
   s += Q.dimV(26, Y(Hmm), Y(0), `H = ${fmt(Hm, 2)} m`, { fs: 10 });
   if (o.secName) s += tx(cx + 3, Y(Hmm * 0.5), esc(o.secName), { fs: 8.5, rot: -90, c: C.ink2, w: 600 });
   return s + '</svg>';
@@ -378,27 +406,34 @@ D.basePlate = function (C0, sec, o) {
   const cxP = 60 + bp * scP / 2, cyP = Hh / 2 + 2;
   const X = (y) => cxP + y * scP, Y = (z) => cyP - z * scP;
   let s = svgOpen(W, Hh, 'class="basesvg" style="max-width:100%;height:auto"');
+  const ed = (k, x, y, w, h, t) => `<rect class="bzd" data-bk="${k}" x="${x}" y="${y}" width="${Math.max(12, w)}" height="${Math.max(12, h)}" fill="transparent" style="cursor:text"><title>${t} – kliknij, aby zmienić na rysunku</title></rect>`;
+  const gz = (z, t, inner) => `<g class="bz" data-bz="${z}" style="cursor:pointer"><title>${t}</title>${inner}</g>`;
   s += tx(8, 16, 'Podstawa słupa – rzut', { fs: 11.5, w: 650, a: 'start' });
-  s += `<rect x="${X(-bp / 2)}" y="${Y(lp / 2)}" width="${bp * scP}" height="${lp * scP}" fill="#e3e8f0" stroke="${C.ink}" stroke-width="1.2"/>`;
+  s += gz('plate', 'Blacha podstawy – kliknij: wymiary, grubość, stal', `<rect x="${X(-bp / 2)}" y="${Y(lp / 2)}" width="${bp * scP}" height="${lp * scP}" fill="#e3e8f0" stroke="${C.ink}" stroke-width="1.2"/>`);
   // strefy docisku (króćce teowe)
   if (C0.Tf && sec.kind !== 'CHS') {
     const zf = C0.zC, bf = C0.Tf.beff, lf = C0.Tf.leff;
-    [1, -1].forEach(sg => { s += `<rect x="${X(-lf / 2)}" y="${Y(sg * zf + bf / 2)}" width="${lf * scP}" height="${bf * scP}" fill="${C.warn}" fill-opacity="0.18" stroke="${C.warn}" stroke-dasharray="3 2" stroke-width="0.8"/>`; });
-    if (C0.Tw && C0.Tw.A > 0) s += `<rect x="${X(-C0.Tw.beff / 2)}" y="${Y(C0.Tw.leff / 2)}" width="${C0.Tw.beff * scP}" height="${C0.Tw.leff * scP}" fill="${C.warn}" fill-opacity="0.12" stroke="${C.warn}" stroke-dasharray="3 2" stroke-width="0.8"/>`;
+    let tz = '';
+    [1, -1].forEach(sg => { tz += `<rect x="${X(-lf / 2)}" y="${Y(sg * zf + bf / 2)}" width="${lf * scP}" height="${bf * scP}" fill="${C.warn}" fill-opacity="0.18" stroke="${C.warn}" stroke-dasharray="3 2" stroke-width="0.8"/>`; });
+    if (C0.Tw && C0.Tw.A > 0) tz += `<rect x="${X(-C0.Tw.beff / 2)}" y="${Y(C0.Tw.leff / 2)}" width="${C0.Tw.beff * scP}" height="${C0.Tw.leff * scP}" fill="${C.warn}" fill-opacity="0.12" stroke="${C.warn}" stroke-dasharray="3 2" stroke-width="0.8"/>`;
+    s += gz('tstub', 'Strefy docisku (króćce teowe, szerokość c) – kliknij: beton, podlewka, k_j', tz);
   }
   // przekrój słupa
   const path = sec.rings.map(r => r.map((p, i) => (i ? 'L' : 'M') + X(p[0]).toFixed(1) + ' ' + Y(p[1] - sec.zc).toFixed(1)).join(' ') + ' Z').join(' ');
-  s += `<path d="${path}" fill="${C.steel}" fill-rule="evenodd" stroke="${C.ink}" stroke-width="1"/>`;
+  s += gz('col', `Słup ${esc(sec.nazwa)} – kliknij: spoiny słupa z blachą`, `<path d="${path}" fill="${C.steel}" fill-rule="evenodd" stroke="${C.ink}" stroke-width="1"/>`);
   // kotwy
   const anchors = [];
   if (C0.uk === 'zew') [1, -1].forEach(sg => [1, -1].forEach(sy => anchors.push([sy * C0.w / 2, sg * C0.zT])));
   else if (C0.nb === 2) [1, -1].forEach(sy => anchors.push([sy * C0.w / 2, 0]));
   else [1, -1].forEach(sg => [1, -1].forEach(sy => anchors.push([sy * C0.w / 2, sg * C0.zT])));
-  anchors.forEach(([y, z]) => { s += `<circle cx="${X(y)}" cy="${Y(z)}" r="${Math.max(3, C0.d0 / 2 * scP)}" fill="#ffffff" stroke="${C.red}" stroke-width="1.3"/><circle cx="${X(y)}" cy="${Y(z)}" r="${Math.max(1.5, C0.d / 2 * scP)}" fill="${C.red}" fill-opacity="0.5"/>`; });
+  let an = '';
+  anchors.forEach(([y, z]) => { an += `<circle cx="${X(y)}" cy="${Y(z)}" r="${Math.max(3, C0.d0 / 2 * scP)}" fill="#ffffff" stroke="${C.red}" stroke-width="1.3"/><circle cx="${X(y)}" cy="${Y(z)}" r="${Math.max(1.5, C0.d / 2 * scP)}" fill="${C.red}" fill-opacity="0.5"/>`; });
+  s += gz('anch', 'Kotwy – kliknij: średnica, klasa, układ, rozstaw', an);
   s += Q.dimH(X(-bp / 2), X(bp / 2), Y(lp / 2) - 12, `b<tspan baseline-shift="sub" font-size="75%">p</tspan> = ${fmt(bp, 0)}`);
   s += Q.dimV(X(-bp / 2) - 14, Y(-lp / 2), Y(lp / 2), `l<tspan baseline-shift="sub" font-size="75%">p</tspan> = ${fmt(lp, 0)}`);
-  if (anchors.length) { const yA = Math.max(...anchors.map(a => a[0])), yB = Math.min(...anchors.map(a => a[0])); s += Q.dimH(X(yB), X(yA), Y(-lp / 2) + 14, `w = ${fmt(C0.w, 0)}`, { below: true }); }
-  if (C0.uk === 'zew') s += Q.dimV(X(bp / 2) + 14, Y(C0.zT), Y(-C0.zT), `2z<tspan baseline-shift="sub" font-size="75%">T</tspan> = ${fmt(2 * C0.zT, 0)}`, { right: true });
+  s += ed('podstawa.bp', X(-bp / 2), Y(lp / 2) - 26, bp * scP, 18, 'Szerokość blachy b_p') + ed('podstawa.lp', X(-bp / 2) - 32, Y(lp / 2), 22, lp * scP, 'Długość blachy l_p');
+  if (anchors.length) { const yA = Math.max(...anchors.map(a => a[0])), yB = Math.min(...anchors.map(a => a[0])); s += Q.dimH(X(yB), X(yA), Y(-lp / 2) + 14, `w = ${fmt(C0.w, 0)}`, { below: true }) + ed('podstawa.kotwy.w', X(yB), Y(-lp / 2) + 8, X(yA) - X(yB), 22, 'Rozstaw kotew w rzędzie w'); }
+  if (C0.uk === 'zew') s += Q.dimV(X(bp / 2) + 14, Y(C0.zT), Y(-C0.zT), `2z<tspan baseline-shift="sub" font-size="75%">T</tspan> = ${fmt(2 * C0.zT, 0)}`, { right: true }) + ed('podstawa.kotwy.ez', X(bp / 2) + 6, Y(C0.zT), 26, 2 * C0.zT * scP, 'Odległość rzędu kotew od krawędzi blachy e_z (2z_T = l_p − 2e_z)');
   s += tx(X(bp / 2) + 6, Y(lp / 2) + 4, `${C0.nb} × ${o.dName || ''} kl. ${o.kl || ''}`, { fs: 9.5, c: C.red, a: 'start' });
   // widok z boku
   const x0 = W * 0.56, wv = W - x0 - 80, scV = Math.min(wv / lp, 1.2 * scP);
@@ -406,18 +441,23 @@ D.basePlate = function (C0, sec, o) {
   const XV = (z) => cxV + z * scV;
   s += tx(x0, 16, 'Widok (płaszczyzna x–z)', { fs: 11.5, w: 650, a: 'start' });
   const tpv = Math.max(4, tp * scV), tgv = Math.max(3, C0.tg * scV);
-  s += `<rect x="${XV(-lp / 2) - 20}" y="${yP + tpv + tgv}" width="${lp * scV + 40}" height="${60}" fill="#eef0f3" stroke="${C.mut}"/>`;
-  s += `<rect x="${XV(-lp / 2)}" y="${yP + tpv}" width="${lp * scV}" height="${tgv}" fill="#d9dde3" stroke="${C.mut}" stroke-dasharray="3 2"/>`;
-  s += `<rect x="${XV(-lp / 2)}" y="${yP}" width="${lp * scV}" height="${tpv}" fill="#b9c3d3" stroke="${C.ink}"/>`;
-  const h2 = sec.h / 2, tf = sec.kind === 'I' ? sec.tg : sec.t;
-  s += `<rect x="${XV(-h2)}" y="${yP - 120}" width="${sec.h * scV}" height="120" fill="${C.steel}" fill-opacity="0.5" stroke="${C.ink}"/>`;
+  s += gz('conc', `Fundament – beton ${esc(o.beton || '')}: kliknij – beton, wymiary fundamentu, k_j`, `<rect x="${XV(-lp / 2) - 20}" y="${yP + tpv + tgv}" width="${lp * scV + 40}" height="${60}" fill="#eef0f3" stroke="${C.mut}"/>`);
+  s += gz('grout', 'Podlewka – kliknij: grubość t_g', `<rect x="${XV(-lp / 2)}" y="${yP + tpv}" width="${lp * scV}" height="${tgv}" fill="#d9dde3" stroke="${C.mut}" stroke-dasharray="3 2"/>`);
+  s += gz('plate', 'Blacha podstawy – kliknij: wymiary, grubość, stal', `<rect x="${XV(-lp / 2)}" y="${yP}" width="${lp * scV}" height="${tpv}" fill="#b9c3d3" stroke="${C.ink}"/>`);
+  const h2 = sec.h / 2, tf = sec.kind === 'I' ? sec.tg : sec.kind === 'CC' ? sec.tf : sec.t;
+  s += gz('col', `Słup ${esc(sec.nazwa)} – kliknij: spoiny słupa z blachą`, `<rect x="${XV(-h2)}" y="${yP - 120}" width="${sec.h * scV}" height="120" fill="${C.steel}" fill-opacity="0.5" stroke="${C.ink}"/>`);
   if (sec.kind !== 'CHS') s += `<line x1="${XV(-h2 + tf)}" y1="${yP - 120}" x2="${XV(-h2 + tf)}" y2="${yP}" stroke="${C.ink}" stroke-width="0.8"/><line x1="${XV(h2 - tf)}" y1="${yP - 120}" x2="${XV(h2 - tf)}" y2="${yP}" stroke="${C.ink}" stroke-width="0.8"/>`;
   // spoiny
-  [-h2, h2].forEach(z => { const sg = z > 0 ? 1 : -1, a = Math.max(3, C0.af * scV * 1.4); s += `<path d="M${XV(z)},${yP} l${sg * a},0 l${-sg * a},${-a} z" fill="${C.ink}"/>`; });
-  if (C0.uk === 'zew') [1, -1].forEach(sg => { const xx = XV(sg * C0.zT); s += `<line x1="${xx}" y1="${yP - 16}" x2="${xx}" y2="${yP + tpv + tgv + 56}" stroke="${C.red}" stroke-width="${Math.max(1.5, C0.d * scV)}"/><rect x="${xx - 6}" y="${yP - 10}" width="12" height="7" fill="${C.red}" fill-opacity="0.7"/>`; });
+  let wl = '';
+  [-h2, h2].forEach(z => { const sg = z > 0 ? 1 : -1, a = Math.max(3, C0.af * scV * 1.4); wl += `<path d="M${XV(z)},${yP} l${sg * a},0 l${-sg * a},${-a} z" fill="${C.ink}"/>`; });
+  s += gz('weld', 'Spoiny słupa z blachą – kliknij: grubości a_f, a_w', wl + `<rect x="${XV(-h2) - 10}" y="${yP - 14}" width="20" height="16" fill="transparent"/><rect x="${XV(h2) - 10}" y="${yP - 14}" width="20" height="16" fill="transparent"/>`);
+  let an2 = '';
+  if (C0.uk === 'zew') [1, -1].forEach(sg => { const xx = XV(sg * C0.zT); an2 += `<line x1="${xx}" y1="${yP - 16}" x2="${xx}" y2="${yP + tpv + tgv + 56}" stroke="${C.red}" stroke-width="${Math.max(1.5, C0.d * scV)}"/><rect x="${xx - 6}" y="${yP - 10}" width="12" height="7" fill="${C.red}" fill-opacity="0.7"/>`; });
+  if (an2) s += gz('anch', 'Kotwy – kliknij: średnica, klasa, układ, rozstaw', an2);
   s += Q.dimV(XV(lp / 2) + 26, yP, yP + tpv, `t<tspan baseline-shift="sub" font-size="75%">p</tspan> = ${fmt(tp, 0)}`, { right: true }) + tx(XV(lp / 2) + 26, yP + tpv + tgv + 12, `podlewka ${fmt(C0.tg, 0)}`, { fs: 9, a: 'start', c: C.mut });
+  s += ed('podstawa.tp', XV(lp / 2) + 20, yP - 4, 40, tpv + 8, 'Grubość blachy t_p') + ed('podstawa.podlewka', XV(lp / 2) + 22, yP + tpv + tgv + 2, 70, 14, 'Grubość podlewki t_g');
   s += tx(XV(0), yP + tpv + tgv + 76, `beton ${esc(o.beton || '')}: f_jd = ${fmt(C0.fjd, 1)} MPa`.replace('_jd', '<tspan baseline-shift="sub" font-size="75%">jd</tspan>'), { fs: 9.5, c: C.ink2 });
-  s += tx(8, Hh - 6, 'strefy docisku (króćce teowe, szerokość c) – kolor pomarańczowy; kotwy – czerwone', { fs: 9, a: 'start', c: C.mut });
+  s += tx(8, Hh - 6, 'kliknij element – jego parametry; kliknij wymiar – zmiana wartości na rysunku; prawy przycisk – menu', { fs: 9, a: 'start', c: C.mut });
   return s + '</svg>';
 };
 

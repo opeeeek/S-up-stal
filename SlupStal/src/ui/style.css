@@ -839,3 +839,30 @@ table.ctab td.tk input[data-tick] { accent-color: var(--ok); cursor: default; }
 :is(#report, #ownrep) table.rtab th, :is(#report, #ownrep) table.rtab td { border: 1px solid #c8cdd5; padding: 2px 7px; text-align: left; vertical-align: top; }
 :is(#report, #ownrep) table.rtab th { background: #f1f3f6; font-weight: 600; }
 :is(#report, #ownrep) table.rtab tr { page-break-inside: avoid; }
+/* ---- zaznaczanie na schemacie (lewy przycisk), jak w BelkaŻB ---- */
+.schemesvg .schcol.sel rect { fill: color-mix(in srgb, var(--acc) 22%, #ffffff) !important; stroke: var(--acc) !important; stroke-width: 2.2 !important; }
+.schemesvg .ld.sel { filter: drop-shadow(0 0 1.5px var(--acc)) drop-shadow(0 0 3px var(--acc)); }
+.schemesvg .ld.sel text { font-weight: 800; }
+.schemesvg .supp.sel, .schemesvg .brace.sel { filter: drop-shadow(0 0 1.5px var(--acc)) drop-shadow(0 0 3px var(--acc)); }
+.schemesvg .supp.sel rect[fill="transparent"] { fill: color-mix(in srgb, var(--acc) 10%, transparent); stroke: var(--acc); stroke-dasharray: 3 2; }
+.ldsum tr.lsel td { background: color-mix(in srgb, var(--acc) 14%, transparent) !important; }
+.ldsum i.lsw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-left: 2px; vertical-align: -1px; }
+.schsel { min-height: 20px; }
+.schsel .lnk { font-size: 12px; }
+h4.lsec { margin: 12px 0 6px; font-size: 13px; }
+.supcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; }
+.supcards label.rad { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.supcards label.rad.on { border-color: var(--acc); background: var(--acc2); }
+.supcards label.rad input { display: none; }
+.supcards svg { flex: none; background: #fff; border-radius: 4px; }
+.schemesvg > text, .schemesvg > g.dimch, .schemesvg > g:not([class]) { pointer-events: none; }
+.schemesvg .dgm { pointer-events: none; }
+/* ---- rysunek podstawy: klikalne elementy i wymiary ---- */
+.basesvg .bz:hover { filter: drop-shadow(0 0 2px var(--acc)); }
+.basesvg .bz.sel { filter: drop-shadow(0 0 1.5px var(--acc)) drop-shadow(0 0 3px var(--acc)); }
+.basesvg .bzd:hover { fill: color-mix(in srgb, var(--acc) 14%, transparent); stroke: var(--acc); stroke-dasharray: 2 2; }
+.inled { position: fixed; z-index: 4000; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--acc); border-radius: 6px; box-shadow: 0 6px 22px rgba(0,0,0,.18); font-size: 12.5px; max-width: 300px; }
+.inled label { width: 100%; font-weight: 600; color: var(--ink); }
+.inled input { width: 90px; height: 28px; text-align: right; }
+.inled small { width: 100%; color: var(--ink3); }
+#dataside .schsel { min-height: 38px; line-height: 1.5; }

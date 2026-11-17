@@ -19,8 +19,8 @@ X.iso834 = (tmin) => 20 + 345 * Math.log10(8 * tmin + 1);
 
 // wskaźnik ekspozycji słupa: 4 – ze wszystkich stron, 3 – jedna płaszczyzna (pas −z) przy ścianie
 X.sectionFactor = function (sec, eksp, ochrona) {
-  let P = 0; const pts = sec.pts;
-  for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; P += Math.hypot(b[0] - a[0], b[1] - a[1]); }
+  let P = 0;
+  (sec.kind === 'CC' ? sec.rings : [sec.pts]).forEach(pts => { for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; P += Math.hypot(b[0] - a[0], b[1] - a[1]); } });
   const b = sec.kind === 'I' ? Math.max(sec.bg, sec.bd) : sec.b;
   let Pk, Pb;
   if (sec.kind === 'CHS') { Pk = Pb = Math.PI * sec.D; if (eksp === '3') { Pk = Pb = Math.PI * sec.D * 0.75; } }

@@ -50,8 +50,22 @@ function sceneOf(S, R, opt) {
     const h = sec.h, b = sec.b, t = sec.t;
     boxCol(-b / 2, b / 2, -h / 2, -h / 2 + t, 0, H, STEEL, 'col'); boxCol(-b / 2, b / 2, h / 2 - t, h / 2, 0, H, STEEL, 'col');
     boxCol(-b / 2, -b / 2 + t, -h / 2 + t, h / 2 - t, 0, H, STEEL, 'col'); boxCol(b / 2 - t, b / 2, -h / 2 + t, h / 2 - t, 0, H, STEEL, 'col');
+  } else if (sec.kind === 'CC') {
+    const h = sec.h, tw = sec.tw, tf = sec.tf, b = sec.ch.b, z0 = -h / 2;
+    [-1, 1].forEach(sg => {
+      const back = sec.uklad === 'wew' ? sg * sec.B / 2 : sg * sec.a / 2, dir = sec.uklad === 'wew' ? -sg : sg;   // kierunek półek od grzbietu
+      const yA = Math.min(back, back + dir * tw), yB = Math.max(back, back + dir * tw), fA = Math.min(back, back + dir * b), fB = Math.max(back, back + dir * b);
+      boxCol(yA, yB, z0 + tf, z0 + h - tf, 0, H, STEEL, 'col');
+      boxCol(fA, fB, z0, z0 + tf, 0, H, STEEL, 'col'); boxCol(fA, fB, z0 + h - tf, z0 + h, 0, H, STEEL, 'col');
+    });
+    // przewiązki (płaszczyzny półek) / przekładki (między grzbietami) – co a_p, także na końcach
+    const pos = []; for (let x = sec.pb / 2; x <= H - sec.pb / 2 + 1; x += sec.pa) pos.push(x); if (H - sec.pb / 2 - pos[pos.length - 1] > 0.3 * sec.pa) pos.push(H - sec.pb / 2);
+    pos.forEach(x => {
+      if (sec.bu && !sec.buPack) { const yb = sec.h0 / 2 + (sec.pz || 40) / 2; [[z0 - sec.pt, z0], [z0 + h, z0 + h + sec.pt]].forEach(([za, zb]) => box(-yb, yb, x - sec.pb / 2, x + sec.pb / 2, za, zb, PLATE, 'col')); }
+      else box(-sec.a / 2, sec.a / 2, x - sec.pb / 2, x + sec.pb / 2, -0.35 * h, 0.35 * h, PLATE, 'col');
+    });
   } else { cyl(sec.D / 2, 0, H, STEEL, 'col'); cyl(sec.D / 2 - sec.t, 0, H, STEEL, 'col', true); ring(sec.D / 2, sec.D / 2 - sec.t, H, STEEL, 'col', true); }
-  const hh = sec.h, bb = sec.kind === 'I' ? Math.max(sec.bg, sec.bd) : sec.b;
+  const hh = sec.h, bb = sec.kind === 'I' ? Math.max(sec.bg, sec.bd) : sec.kind === 'CC' ? sec.B : sec.b;
   // ---- głowica (orientacyjnie) gdy wierzchołek podparty
   const topSup = R.md && ['prz', 'utw', 'utwp'].some(g => R.md.bc.gora.y === g || R.md.bc.gora.z === g);
   if (topSup && sec.kind !== 'CHS') box(-bb / 2 - 20, bb / 2 + 20, H, H + 15, -hh / 2 - 20, hh / 2 + 20, PLATE, 'cap');
@@ -245,7 +259,7 @@ W3.elevSVG = function (S, R, o) {
   const mt = 34, mb = 46, k = (Hs - mt - mb) / (zTop - zBot);
   const Y = z => Hs - mb - (z - zBot) * k;
   const views = [{ pl: 'y', t: 'Płaszczyzna x–z (M_y)', w: sec.h, wp: pb ? pb.lp : 0, an: pb ? (pb.uk === 'zew' ? [-pb.zT, pb.zT] : pb.nb === 2 ? [0] : [-pb.zT, pb.zT]) : [] },
-                 { pl: 'z', t: 'Płaszczyzna x–y (M_z)', w: sec.kind === 'I' ? Math.max(sec.bg, sec.bd) : sec.b, wp: pb ? pb.bp : 0, an: pb ? [-pb.w / 2, pb.w / 2] : [] }];
+                 { pl: 'z', t: 'Płaszczyzna x–y (M_z)', w: sec.kind === 'I' ? Math.max(sec.bg, sec.bd) : sec.kind === 'CC' ? sec.B : sec.b, wp: pb ? pb.bp : 0, an: pb ? [-pb.w / 2, pb.w / 2] : [] }];
   const fwOf = (v) => (pb ? Math.max(v.wp + 300, v.w + 500) : v.w + 200);
   const kx = Math.min(110 / Math.max(sec.h, sec.b || sec.h), (W / 2 - 70) / Math.max(...views.map(fwOf)));
   let s = svgOpen(W, Hs, `class="elevsvg" data-h="${H}" data-mt="${mt}" data-mb="${mb}" data-zb="${zBot}" data-zt="${zTop}" data-k="${k}"`);
@@ -268,6 +282,14 @@ W3.elevSVG = function (S, R, o) {
     s += `<g class="el-col" data-pl="${v.pl}" style="cursor:pointer"><title>Słup ${esc(sec.nazwa)} – kliknij: siły i sprawdzenia na tej wysokości; dwuklik: przekrój</title><rect x="${X(-w / 2)}" y="${yT}" width="${w * kx}" height="${yB - yT}" fill="${C.steel}" fill-opacity="0.55" stroke="${C.ink}" stroke-width="1.1"/>`;
     if (sec.kind === 'I' && v.pl === 'y') { s += `<line x1="${X(-w / 2 + sec.td)}" y1="${yT}" x2="${X(-w / 2 + sec.td)}" y2="${yB}" stroke="${C.ink}" stroke-width="0.7"/><line x1="${X(w / 2 - sec.tg)}" y1="${yT}" x2="${X(w / 2 - sec.tg)}" y2="${yB}" stroke="${C.ink}" stroke-width="0.7"/>`; }
     else if (sec.kind === 'I') s += `<line x1="${X(-sec.tw / 2)}" y1="${yT}" x2="${X(-sec.tw / 2)}" y2="${yB}" stroke="${C.ink}" stroke-width="0.6" stroke-dasharray="6 3"/><line x1="${X(sec.tw / 2)}" y1="${yT}" x2="${X(sec.tw / 2)}" y2="${yB}" stroke="${C.ink}" stroke-width="0.6" stroke-dasharray="6 3"/>`;
+    else if (sec.kind === 'CC' && v.pl === 'y') s += `<line x1="${X(-w / 2 + sec.tf)}" y1="${yT}" x2="${X(-w / 2 + sec.tf)}" y2="${yB}" stroke="${C.ink}" stroke-width="0.7"/><line x1="${X(w / 2 - sec.tf)}" y1="${yT}" x2="${X(w / 2 - sec.tf)}" y2="${yB}" stroke="${C.ink}" stroke-width="0.7"/>`;
+    else if (sec.kind === 'CC') {
+      const gIn = sec.uklad === 'wew' ? sec.B / 2 - sec.ch.b : sec.a / 2;      // wewnętrzna krawędź gałęzi
+      s += `<rect x="${X(-gIn)}" y="${yT}" width="${2 * gIn * kx}" height="${yB - yT}" fill="${C.bg || '#ffffff'}" stroke="${C.ink}" stroke-width="0.8"/>`;
+      const Hm = R.md.H; let xx = sec.pb / 2; const pos = []; for (; xx <= Hm - sec.pb / 2 + 1; xx += sec.pa) pos.push(xx); if (Hm - sec.pb / 2 - pos[pos.length - 1] > 0.3 * sec.pa) pos.push(Hm - sec.pb / 2);
+      const wb = sec.bu && !sec.buPack ? sec.h0 / 2 + (sec.pz || 40) / 2 : gIn;
+      pos.forEach(x0 => { const ya = Y(x0 + sec.pb / 2), yb2 = Y(x0 - sec.pb / 2); s += `<rect class="el-bat" x="${X(-wb)}" y="${ya}" width="${2 * wb * kx}" height="${Math.max(2, yb2 - ya)}" fill="#b9c3d3" stroke="${C.ink}" stroke-width="0.7"><title>${sec.bu && !sec.buPack ? 'Przewiązka' : 'Przekładka'} co ${fmt(sec.pa, 0)} mm</title></rect>`; });
+    }
     else if (sec.kind === 'RHS') { const t = sec.t; s += `<line x1="${X(-w / 2 + t)}" y1="${yT}" x2="${X(-w / 2 + t)}" y2="${yB}" stroke="${C.ink}" stroke-width="0.6" stroke-dasharray="6 3"/><line x1="${X(w / 2 - t)}" y1="${yT}" x2="${X(w / 2 - t)}" y2="${yB}" stroke="${C.ink}" stroke-width="0.6" stroke-dasharray="6 3"/>`; }
     s += `<line x1="${X(0)}" y1="${yT - 14}" x2="${X(0)}" y2="${yB + 14}" stroke="${C.blu}" stroke-width="0.7" stroke-dasharray="10 3 2 3"/></g>`;
     // głowica i warunek u góry
@@ -490,7 +512,7 @@ function bindElev(el, S, R) {
   });
   $$('.el-base, .el-found', svg).forEach(g => g.addEventListener('click', ev => { ev.stopPropagation(); a.basePopup(); }));
   $$('.el-brace', svg).forEach(g => g.addEventListener('click', ev => { ev.stopPropagation(); a.bracesPopup(+g.dataset.i); }));
-  $$('.el-top', svg).forEach(g => g.addEventListener('click', ev => { ev.stopPropagation(); a.supportPopup(g.dataset.pl); }));
+  $$('.el-top', svg).forEach(g => g.addEventListener('click', ev => { ev.stopPropagation(); a.supportPopup(g.dataset.pl, 'gora'); }));
   svg.addEventListener('contextmenu', ev => { ev.preventDefault(); const x = Math.max(0, Math.min(R.md.H, hOf(ev))); Q.ctxMenu(ev.clientX, ev.clientY, [['at', `Siły i sprawdzenia na x = ${fmt(x / 1000, 2)} m…`], ['load', 'Obciążenie w tym miejscu…'], ['brace', 'Stężenia…'], ['sec', 'Przekrój…'], ['base', 'Podstawa słupa…']], k => { if (k === 'at') W3.atXPopup(x); else if (k === 'load') a.loadPopup(null, { x: Math.round(x / 50) * 0.05 }); else if (k === 'brace') a.bracesPopup(); else if (k === 'sec') a.secPopup(); else a.basePopup(); }); });
 }
 W3.exportDXF = async function () {

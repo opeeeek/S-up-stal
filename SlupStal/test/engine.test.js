@@ -121,5 +121,55 @@ cfgs.forEach(([name, f]) => {
   const R = J.run(s); const b = J.designBase(s, R, 90);
   ok('dobór podstawy (η ≤ 90%)', !b.err && b.u <= 0.9, b.err || `${b.lp}×${b.bp}×${b.tp} ${b.d} ${b.kl}`);
 }
+/* 7. Słup z dwóch ceowników (PN-EN 1993-1-1, 6.4) – charakterystyki i obliczenie ręczne */
+{
+  const P = BS.P;
+  const s0 = P.props(P.geom({ typ: 'dwuc', seria: 'UPN', nr: 200, uklad: 'zew', a: 140, pa: 700, pb: 150, pt: 10, pc: 60, pw: 5 }));
+  const ch = s0.pc;
+  near('2×UPN 200: A = 2·A_ch', s0.A, 2 * ch.A, 1e-9);
+  near('2×UPN 200: I_y = 2·I_y,ch (oś materiałowa)', s0.Iy, 2 * ch.Iy, 1e-9);
+  near('2×UPN 200: I_z = 2·(I_ch + A_ch·(h0/2)²) (oś niematerialna)', s0.Iz, 2 * (ch.Iz + ch.A * (s0.h0 / 2) ** 2), 1e-6);
+  near('2×UPN 200: h0 = a + 2e', s0.h0, 140 + 2 * ch.yc, 1e-9);
+  near('2×UPN 200: W_pl,z = A_ch·h0 (gałęzie po obu stronach osi)', s0.Wpl_z, ch.A * s0.h0, 1e-6);
+  const sw = P.props(P.geom({ typ: 'dwuc', seria: 'UPE', nr: 200, uklad: 'wew', a: 60 }));
+  near('2×UPE 200 [ ]: h0 = a + 2b − 2e', sw.h0, 60 + 2 * 80 - 2 * sw.pc.yc, 1e-9);
+  // słup przegubowy H = 6 m z przewiązkami, N = 600 kN (wartość obliczeniowa), bez momentów – obliczenie ręczne 6.4
+  const s = base();
+  Object.assign(s, { geom: { H: 6 }, przekroj: { typ: 'dwuc', seria: 'UPN', nr: 200, uklad: 'zew', a: 140, pa: 700, pb: 150, pt: 10, pc: 60, pw: 5 }, material: { gatunek: 'S235', podgatunek: 'J2', fyRecz: '' } });
+  J.applyScheme(s, 'pp'); s.analiza.metoda = 'I';
+  s.obciazenia = [{ id: 'G1', nazwa: 'N', rodzaj: 'G', wyklucz: '', aktywne: true, sklad: [{ typ: 'N', x: '', F: 600 / 1.35, ey: 0, ez: 0 }] }];
+  const R = J.run(s);
+  ok('2×UPN 200 z przewiązkami: brak błędów', !R.errors.length, R.errors.join('; '));
+  const sec = R.sec, E = 210000, fy = 235, L = 6000, Ach = sec.A_ch, Ich = sec.I_ch, h0 = sec.h0, a = 700;
+  const I1 = 0.5 * h0 * h0 * Ach + 2 * Ich, i0 = Math.sqrt(I1 / (2 * Ach)), lam = L / i0, mu = lam <= 75 ? 1 : lam >= 150 ? 0 : 2 - lam / 75;
+  const Ieff = 0.5 * h0 * h0 * Ach + 2 * mu * Ich, Ib = 10 * 150 ** 3 / 12;
+  const Sv = Math.min(24 * E * Ich / (a * a * (1 + 2 * Ich * h0 / (2 * Ib * a))), 2 * Math.PI ** 2 * E * Ich / (a * a));
+  const Ncr = Math.PI ** 2 * E * Ieff / (L * L), NEd = 600e3, e0 = L / 500;
+  const MEd = NEd * e0 / (1 - NEd / Ncr - NEd / Sv), Nch = 0.5 * NEd + MEd * h0 * Ach / (2 * Ieff);
+  const lch = a / sec.i_ch / (Math.PI * Math.sqrt(E / fy)), phc = 0.5 * (1 + 0.49 * (lch - 0.2) + lch * lch), chic = 1 / (phc + Math.sqrt(phc * phc - lch * lch));
+  const VEd = Math.PI * MEd / L, Mch = VEd * a / 4, u1 = Nch / (chic * Ach * fy) + Mch / (sec.Wel_z_ch * fy);
+  const b1 = R.checks.find(c => c.id === 'BU1');
+  ok('6.4: sprawdzenie gałęzi BU1 obecne, brak „Bz” (oś niematerialna wg 6.4)', !!b1 && !R.checks.some(c => c.id === 'Bz'));
+  if (b1) {
+    near('6.4: I_eff (6.74)', b1.d.bu.Ieff, Ieff, 1e-6);
+    near('6.4: S_v (6.73)', b1.d.bu.Sv, Sv, 1e-6);
+    near('6.4: M_Ed (6.69) – ręcznie ' + (MEd / 1e6).toFixed(3) + ' kNm', b1.d.bu.MEd, MEd, 0.002);
+    near('6.4: N_ch,Ed (6.69) – ręcznie ' + (Nch / 1e3).toFixed(2) + ' kN', b1.d.bu.Nch, Nch, 0.002);
+    near('6.4: wytężenie gałęzi między przewiązkami', b1.util, u1, 0.003);
+  }
+  const bb = R.checks.find(c => c.id === 'BUb');
+  if (bb) { const Tb = VEd * a / (2 * h0), Mb = VEd * a / 4, sg = Mb / (10 * 150 * 150 / 6), ta = 1.5 * Tb / (10 * 150); near('6.4: przewiązka σ_red = √(σ² + 3τ²)', bb.d.bu.sred, Math.sqrt(sg * sg + 3 * ta * ta), 0.003); }
+  // plecami – przekładki co ≤ 15 i_min: pręt jednolity (Bz z pełnym I_z, krzywa c)
+  const s2 = U.clone(s); s2.przekroj = { typ: 'dwuc', seria: 'UPN', nr: 200, uklad: 'plecy', a: 10, pa: 250 }; s2.obciazenia[0].sklad[0].F = 150 / 1.35;
+  const R2 = J.run(s2), bs = R2.checks.find(c => c.id === 'BUs');
+  ok('6.4.4: plecami, a ≤ 15·i_min → pręt jednolity (BUs spełniony, Bz obecne)', !R2.errors.length && bs && bs.status === 'ok' && R2.checks.some(c => c.id === 'Bz') && !R2.checks.some(c => c.id === 'BU1'), bs ? `15·i_min = ${bs.Rd.toFixed(0)} mm` : '');
+  const s3 = U.clone(s2); s3.przekroj.pa = 900;
+  const R3 = J.run(s3);
+  ok('6.4.4(2): plecami, a > 15·i_min → sprawdzenie jak z przewiązkami', !R3.errors.length && R3.checks.some(c => c.id === 'BU1') && !R3.checks.some(c => c.id === 'Bz'));
+  // dobór najlżejszego ceownika
+  const s4 = J.defaultState(); s4.przekroj = { typ: 'dwuc', seria: 'UPN', nr: 300, uklad: 'zew', a: '' };
+  const r4 = J.designSection(s4, 90);
+  ok('dobór 2×UPN (η ≤ 90%)', !r4.err && J.passes(J.run(Object.assign(U.clone(s4), { przekroj: r4.d })), 90, 'sec'), r4.err || `2×${r4.d.seria} ${r4.d.nr}`);
+}
 console.log(`\n${n - fails}/${n} testów zaliczonych`);
 process.exitCode = fails ? 1 : 0;

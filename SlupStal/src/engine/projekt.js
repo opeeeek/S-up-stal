@@ -98,7 +98,7 @@ J.run = function (st0, opt) {
   ['gG_sup', 'gG_inf', 'gQ', 'xi', 'gG_sup_equ', 'gG_inf_equ', 'gQ_equ', 'KFI', 'gM0', 'gM1', 'gM2', 'gM3', 'lamLT0', 'betaLT', 'eta', 'phi0', 'alfaCr', 'HV015', 'Cfd', 'k2', 'gMfi', 'dTR', 'gc', 'acc', 'betaJ'].forEach(k => { ndp[k] = U.num(ndp[k]); });
   // --- przekrój i materiał
   let sec;
-  try { const g = P.geom(st.przekroj); const ge = P.validate(g); if (ge.length) { ge.forEach(err); return out; } sec = P.props(g); }
+  try { const g = P.geom(Object.assign({ Hcol: U.num(st.geom.H) * 1000 }, st.przekroj)); const ge = P.validate(g); if (ge.length) { ge.forEach(err); return out; } sec = P.props(g); }
   catch (e) { err('Przekrój: ' + e.message); return out; }
   out.sec = sec;
   const gat = st.material.gatunek, pod = st.material.podgatunek;
@@ -225,7 +225,18 @@ J.run = function (st0, opt) {
         const NEd = mem.Nmax;
         if (NEd > 0 && method !== 'II_pelna') {
           rec('By', { util: NEd / fy1.NbRd, combo: c, vr: vr.lab, mem, NEd, f: fy1 });
-          rec('Bz', { util: NEd / fz1.NbRd, combo: c, vr: vr.lab, mem, NEd, f: fz1 });
+          if (!sec.bu) rec('Bz', { util: NEd / fz1.NbRd, combo: c, vr: vr.lab, mem, NEd, f: fz1 });
+        }
+        // słup złożony (6.4): siła w gałęzi, gałąź między przewiązkami i względem osi materiałowej, przewiązki i spoiny
+        if (sec.bu && NEd > 0) {
+          let Lz = isFinite(fz1.Lcr) && fz1.Lcr > 0 ? fz1.Lcr : (mem.nc && mem.nc.z && isFinite(mem.nc.z.alpha) && mem.nc.z.alpha > 0 ? Math.PI * Math.sqrt(U.E * sec.Iz / mem.nc.z.alpha) : md.H);
+          let Ly = isFinite(fy1.Lcr) && fy1.Lcr > 0 ? fy1.Lcr : (mem.nc && mem.nc.y && isFinite(mem.nc.y.alpha) && mem.nc.y.alpha > 0 ? Math.PI * Math.sqrt(U.E * sec.Iy / mem.nc.y.alpha) : md.H);
+          const MzI = method === 'II_glob' ? S.maxAbs(F.z.M).v : S.maxAbs(c1.z.M).v;
+          const kyy = Math.max(1, ...mem.segs.map(s2 => s2.kyy || 0));
+          const bu = T.builtUp(sec, base, ndp, { NEd, MzI: Math.abs(MzI), VyI: Math.abs(S.maxAbs(c1.z.V).v), Lcr: Lz, Lcry: Ly, MyEd: Math.abs(S.maxAbs(F.y.M).v), kyy, fu: mat.fu, betaW: M.betaW(gat), H: md.H });
+          rec('BU1', { util: bu.u1, combo: c, vr: vr.lab, bu });
+          rec('BU2', { util: bu.u2, combo: c, vr: vr.lab, bu });
+          if (!bu.pack) { rec('BUb', { util: bu.ub, combo: c, vr: vr.lab, bu }); rec('BUw', { util: bu.uw, combo: c, vr: vr.lab, bu }); }
         }
         if (NEd > 0 && mem.tors.relevant && isFinite(mem.tors.Ncr) && method !== 'II_pelna' || NEd > 0 && mem.tors.relevant && method === 'II_pelna' && mem.tors.chi < 1) rec('BT', { util: NEd / mem.tors.NbRd, combo: c, vr: vr.lab, mem, NEd, f: mem.tors });
         mem.segs.forEach((s, si) => {
@@ -259,7 +270,7 @@ J.run = function (st0, opt) {
   recSec('Vz', 'Ścinanie V_z (siła wzdłuż osi z)', '6.2.6', q => Math.abs(q.e.Vz), () => base.Vplz, 'F');
   recSec('Vy', 'Ścinanie V_y (siła wzdłuż osi y)', '6.2.6', q => Math.abs(q.e.Vy), () => base.Vply, 'F');
   // wyboczenie środnika przy ścinaniu
-  if (sec.kind === 'I' || sec.kind === 'RHS') {
+  if (sec.kind === 'I' || sec.kind === 'RHS' || sec.kind === 'CC') {
     const sb = R.shearBuckling(sec, base, ndp, {});
     out.sb = sb;
     if (sb.need && reg.Vz) out.checks.push(BS.check({ id: 'Vb', grp: G1, n: 'Wyboczenie środnika przy ścinaniu', ref: 'PN-EN 1993-1-5, 5.2', Ed: Math.abs(reg.Vz.e.Vz), Rd: sb.Vb, unit: 'F', util: Math.abs(reg.Vz.e.Vz) / sb.Vb, x: reg.Vz.x, combo: fmtCombo(reg.Vz.combo), d: { sb, q: reg.Vz } }));
@@ -268,6 +279,23 @@ J.run = function (st0, opt) {
   if (reg.By) out.checks.push(BS.check({ id: 'By', grp: G2, n: 'Wyboczenie giętne względem osi y–y', ref: '6.3.1', Ed: reg.By.NEd, Rd: reg.By.f.NbRd, unit: 'F', util: reg.By.util, combo: fmtCombo(reg.By.combo), d: reg.By }));
   if (reg.Bz) out.checks.push(BS.check({ id: 'Bz', grp: G2, n: 'Wyboczenie giętne względem osi z–z', ref: '6.3.1', Ed: reg.Bz.NEd, Rd: reg.Bz.f.NbRd, unit: 'F', util: reg.Bz.util, combo: fmtCombo(reg.Bz.combo), d: reg.Bz }));
   if (reg.BT) out.checks.push(BS.check({ id: 'BT', grp: G2, n: reg.BT.f.tfGov ? 'Wyboczenie giętno-skrętne (sprzężone u–φ)' : 'Wyboczenie skrętne', ref: '6.3.1.4', Ed: reg.BT.NEd, Rd: reg.BT.f.NbRd, unit: 'F', util: reg.BT.util, combo: fmtCombo(reg.BT.combo), d: reg.BT }));
+  // słup złożony z dwóch ceowników (6.4)
+  if (sec.kind === 'CC') {
+    const GB = 'Słup złożony (PN-EN 1993-1-1, 6.4)';
+    if (!sec.bu) out.checks.push(BS.check({ id: 'BUs', grp: GB, n: `Rozstaw przekładek a ≤ 15·i_min – słup jako pręt jednolity (tabl. 6.9)`, ref: '6.4.4, tabl. 6.9', Ed: sec.pa, Rd: sec.lim15, unit: 'mm', util: sec.pa / sec.lim15, d: { sec } }));
+    else {
+      const q1 = reg.BU1, q2 = reg.BU2, qb = reg.BUb, qw = reg.BUw;
+      if (sec.buPack) out.checks.push(BS.check({ id: 'BUs', grp: GB, n: 'Rozstaw przekładek a > 15·i_min – słup sprawdzany jak pręt z przewiązkami', ref: '6.4.4(2), tabl. 6.9', Ed: sec.pa, Rd: sec.lim15, unit: 'mm', util: sec.pa / sec.lim15, info: true, forceStatus: 'warn', d: { sec } }));
+      if (q1) out.checks.push(BS.check({ id: 'BU1', grp: GB, n: 'Gałąź między przewiązkami: N_ch,Ed i M_ch,Ed (wyboczenie względem osi gałęzi)', ref: '6.4.1 (6.69)–(6.74), rys. 6.11', Ed: q1.bu.Nch, Rd: q1.bu.NbCh, unit: '-', util: q1.util, combo: fmtCombo(q1.combo) + (q1.vr ? ' · ' + q1.vr : ''), d: q1 }));
+      if (q2) out.checks.push(BS.check({ id: 'BU2', grp: GB, n: 'Gałąź – wyboczenie względem osi materiałowej y–y z momentem M_y', ref: '6.4.1, 6.3.1, 6.3.3', Ed: q2.bu.Nch, Rd: q2.bu.NbY, unit: '-', util: q2.util, combo: fmtCombo(q2.combo) + (q2.vr ? ' · ' + q2.vr : ''), d: q2 }));
+      if (qb) out.checks.push(BS.check({ id: 'BUb', grp: GB, n: `Przewiązki ${U.fmt(sec.pb, 0)}×${U.fmt(sec.pt, 0)} mm – zginanie i ścinanie`, ref: '6.4.3.1(2), rys. 6.11; 6.2.1(5)', Ed: qb.bu.sred, Rd: qb.bu.fyd, unit: 'MPa', util: qb.util, combo: fmtCombo(qb.combo), d: qb }));
+      if (qw) out.checks.push(BS.check({ id: 'BUw', grp: GB, n: `Spoiny przewiązek a = ${U.fmt(sec.pw, 0)} mm`, ref: 'PN-EN 1993-1-8, 4.5.3.3', Ed: qw.bu.weld.tw, Rd: qw.bu.weld.fvw, unit: 'MPa', util: qw.util, combo: fmtCombo(qw.combo), d: qw }));
+      if (q1 && !sec.buPack) {
+        const b0 = q1.bu;
+        out.checks.push(BS.check({ id: 'BUp', grp: GB, n: `Liczba przedziałów między przewiązkami H/a = ${U.fmt(b0.panels, 1)} ≥ 3; sztywność przewiązek n·I_b/h₀ ≥ 10·I_ch/a`, ref: '6.4.1(1), 6.4.3.1', Ed: 3, Rd: b0.panels, unit: '-', util: Math.max(3 / b0.panels, b0.ich10 / b0.nIb), info: true, forceStatus: b0.panels >= 3 && b0.stiffOk ? 'ok' : 'warn', d: q1 }));
+      }
+    }
+  }
   const segN = (s) => md.stez.length || T.segLT(md).length > 1 ? ` – odcinek ${U.fmt(s.sg.x0 / 1000, 2)}–${U.fmt(s.sg.x1 / 1000, 2)} m` : '';
   Object.keys(reg).filter(k => /^LT\d+$/.test(k)).forEach(k => { const q = reg[k]; out.checks.push(BS.check({ id: k, grp: G2, n: 'Zwichrzenie' + segN(q.s), ref: '6.3.2.1, ' + (q.s.met === '6.3.2.3' ? '6.3.2.3' : '6.3.2.2'), Ed: q.s.MyEd + q.s.dMy, Rd: q.s.MbRd, unit: 'M', util: q.util, x: q.s.xMy, combo: fmtCombo(q.combo) + (method !== 'I' ? ` · ${q.vr}` : ''), d: q })); });
   Object.keys(reg).filter(k => /^I6[12]_\d+$/.test(k)).sort().forEach(k => { const q = reg[k], is61 = /^I61/.test(k); out.checks.push(BS.check({ id: k, grp: G2, n: `Interakcja N + M_y + M_z (${is61 ? '6.61' : '6.62'}, zał. ${q.s.meth})` + segN(q.s), ref: '6.3.3 (' + (is61 ? '6.61' : '6.62') + '), zał. ' + q.s.meth, Ed: q.util, Rd: 1, unit: '-', util: q.util, combo: fmtCombo(q.combo) + (method !== 'I' ? ` · ${q.vr}` : ''), d: q })); });
@@ -421,6 +449,7 @@ J.secCandidates = function (st) {
   if (typ === 'walc') return P.lista(d.seria).map(nr => ({ typ, seria: d.seria, nr }));
   if (typ === 'rura') { if (d.seria === 'wlasna') return []; return P.lista(d.seria).map(nr => ({ typ, seria: d.seria, nr, wyk: d.wyk })); }
   if (typ === 'chs') { if (d.seria === 'wlasna') return []; return P.lista('CHS').map(nr => ({ typ, seria: 'CHS', nr, wyk: d.wyk })); }
+  if (typ === 'dwuc') { const ser = /^UP[NE]$/.test(d.seria) ? d.seria : 'UPN'; return P.lista(ser).map(nr => Object.assign({}, d, { seria: ser, nr })); }
   if (typ === 'spaw') {
     const out = [], h = U.num(d.h), b = U.num(d.bg), bd = U.num(d.bd || d.bg);
     [8, 10, 12, 15, 16, 18, 20, 22, 25, 28, 30, 35, 40].forEach(tf => [6, 8, 10, 12, 14, 16, 20].forEach(tw => { if (tw <= tf + 4 && 2 * tf < h) out.push(Object.assign({}, d, { tg: tf, td: tf * (U.num(d.td) / Math.max(1, U.num(d.tg)) || 1), tw })); }));
@@ -472,7 +501,7 @@ J.designBase = function (st, R, eta) {
           let u = 0, uf = 0, uw = 0;
           for (const f of forces) { const r = PB.check(C, f, ndp, sec); u = Math.max(u, r.uN, r.uNt, r.uM, r.uV, r.uTV); uf = Math.max(uf, r.uWf); uw = Math.max(uw, r.uWw); if (u > lim) break; }
           if (u <= lim) {
-            const tmin = Math.min(sec.kind === 'I' ? Math.max(sec.tg, sec.td) : sec.t, tp);
+            const tmin = Math.min(sec.kind === 'I' ? Math.max(sec.tg, sec.td) : sec.kind === 'CC' ? sec.tf : sec.t, tp);
             const AS = [4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 20];
             const af = AS.find(a => a >= C.af * uf / lim - 1e-9 && a >= 4) || null, aw = AS.find(a => a >= C.aw * uw / lim - 1e-9 && a >= 4) || null;
             if (!af || !aw || af > 0.7 * tmin + 1e-9 || aw > 0.7 * Math.min(sec.tw || sec.t, tp) + 1e-9) continue;

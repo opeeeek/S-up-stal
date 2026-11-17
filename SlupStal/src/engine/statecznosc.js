@@ -25,6 +25,7 @@ T.chi = (lam, al) => { if (lam <= 0.2) return 1; const ph = T.phi(lam, al); retu
 
 /* krzywe wyboczeniowe – tabl. 6.2 */
 T.curveFlex = function (sec, fy) {
+  if (sec.kind === 'CC') return { y: 'c', z: 'c', why: 'ceowniki (tabl. 6.2: przekroje U) – gałęzie słupa złożonego' };
   if (sec.kind === 'RHS' || sec.kind === 'CHS') {
     if (sec.wyk === 'zimn') return { y: 'c', z: 'c', why: 'kształtownik zamknięty formowany na zimno' };
     return fy >= 460 ? { y: 'a0', z: 'a0', why: 'kształtownik zamknięty gorąco wykończony, S460' } : { y: 'a', z: 'a', why: 'kształtownik zamknięty gorąco wykończony' };
@@ -276,10 +277,16 @@ T.member = function (c) {
     o.chi = method === 'II_pelna' ? 1 : T.chi(o.lam, ALPHA[o.curve]);
     o.phi = T.phi(o.lam, ALPHA[o.curve]);
     o.NbRd = o.chi * NRk / g1;
+    if (pl === 'z' && sec.bu) {
+      // słup złożony z przewiązkami / przekładkami w rozstawie > 15 i_min – wyboczenie względem osi niematerialnej wg 6.4 (siła w gałęzi);
+      // w interakcji 6.61/6.62 χ_z = 1 (stateczność gałęzi sprawdzana osobno)
+      o.bu = true; o.chiStd = o.chi; o.chi = 1; o.NbRd = NRk / g1;
+      o.src = (o.src || '') + ' · oś niematerialna – sprawdzenie gałęzi wg 6.4';
+    }
     flex[pl] = o;
   });
   // --- skrętne i giętno-skrętne (przekroje otwarte)
-  const tors = { relevant: sec.kind === 'I' };
+  const tors = { relevant: sec.kind === 'I' || (sec.kind === 'CC' && !sec.bu) };
   if (tors.relevant) {
     const i02 = (sec.Iy + sec.Iz) / sec.A + (sec.z0 || 0) ** 2;
     tors.i02 = i02;
@@ -307,7 +314,7 @@ T.member = function (c) {
     tors.governs = method === 'II_pelna' ? tors.chi < 1 : tors.chi < flex.z.chi - 1e-9;
   }
   // --- zwichrzenie i interakcja w odcinkach zwichrzeniowych
-  const ltbSus = sec.kind === 'I';
+  const ltbSus = sec.kind === 'I' || (sec.kind === 'CC' && !sec.bu);
   const met = sec.kind === 'I' && sec.sym ? (ndp.ltbMet || '6.3.2.3') : '6.3.2.2';
   const segs = T.segLT(md), segY = T.segPlane(md, 'y'), segZ = T.segPlane(md, 'z');
   const My = Fd.y.M, Mz = Fd.z.M, Nar = Fd.N;
@@ -360,7 +367,7 @@ T.member = function (c) {
     const fy1 = flex.y, fz1 = flex.z;
     const chiy = fy1.chi, chiz0 = fz1.chi;
     const chiz = tors.relevant && tors.governs ? Math.min(chiz0, tors.chi) : chiz0;
-    const lamy = method === 'II_pelna' ? 0 : fy1.lam, lamz = method === 'II_pelna' ? 0 : fz1.lam;
+    const lamy = method === 'II_pelna' ? 0 : fy1.lam, lamz = method === 'II_pelna' || fz1.bu ? 0 : fz1.lam;
     const r = { sg, NEd, MyEd, MzEd, dMy, cls, Wy, Wz, MyRk, MzRk, NRk, chiy, chiz, chiz0, chiT: tors.relevant ? tors.chi : 1, lamy, lamz, Mcr, lamLT, ltb, chiLT, C1, kc, met, shY, shZ, sgY, sgZ, swayY, swayZ, xMy: shY.xmax, xMz: shZ.xmax };
     // ---- współczynniki C_m i k_ij
     const meth = kNinterMet;
@@ -451,6 +458,62 @@ T.member = function (c) {
     out.push(r);
   });
   return { flex, tors, segs: out, nc, mcr, met, ltbSus, Nmax };
+};
+/* ---------------------------------------------------------- słup złożony z dwóch gałęzi (PN-EN 1993-1-1, 6.4) */
+// q: { NEd, MzI – moment I rzędu względem osi niematerialnej (maks.), VyI, Lcr – długość wyboczeniowa względem z–z, Lcry, MyEd, kyy, fu, betaW }
+T.builtUp = function (sec, base, ndp, q) {
+  const E = U.E, fy = base.fy, g0 = ndp.gM0, g1 = ndp.gM1, g2 = ndp.gM2;
+  const Ach = sec.A_ch, Ich = sec.I_ch, h0 = sec.h0, a = sec.pa, n = 2, L = q.Lcr, NEd = Math.max(0, q.NEd);
+  const o = { Ach, Ich, h0, a, n, L, NEd, pack: !!sec.buPack };
+  o.I1 = 0.5 * h0 * h0 * Ach + 2 * Ich;
+  o.i0 = Math.sqrt(o.I1 / (2 * Ach));
+  o.lam = L / o.i0;
+  o.mu = o.lam <= 75 ? 1 : o.lam >= 150 ? 0 : 2 - o.lam / 75;                       // tabl. 6.8
+  o.Ieff = 0.5 * h0 * h0 * Ach + 2 * o.mu * Ich;                                      // (6.74)
+  o.Ib = o.pack ? Infinity : sec.pt * Math.pow(sec.pb, 3) / 12;
+  o.Sv1 = o.pack ? Infinity : 24 * E * Ich / (a * a * (1 + 2 * Ich * h0 / (n * o.Ib * a)));
+  o.Sv2 = 2 * Math.PI * Math.PI * E * Ich / (a * a);
+  o.Sv = Math.min(o.Sv1, o.Sv2);                                                     // (6.73)
+  o.Ncr = Math.PI * Math.PI * E * o.Ieff / (L * L);                                  // (6.72)
+  o.e0 = L / 500;
+  o.MI = Math.abs(q.MzI || 0);
+  o.den = 1 - NEd / o.Ncr - NEd / o.Sv;
+  o.MEd = o.den > 0 ? (NEd * o.e0 + o.MI) / o.den : Infinity;                       // (6.69)
+  o.Nch = 0.5 * NEd + o.MEd * h0 * Ach / (2 * o.Ieff);                              // (6.69)
+  o.VEd6 = Math.PI * o.MEd / L;                                                      // (6.70)
+  o.VEd = Math.max(o.VEd6, Math.abs(q.VyI || 0));
+  const lam1 = Math.PI * Math.sqrt(E / fy);
+  // gałąź między przewiązkami – wyboczenie względem osi własnej gałęzi (L_ch = a), z momentem lokalnym M_ch = V_Ed·a/4 (rys. 6.11)
+  o.lamCh = a / sec.i_ch / lam1; o.chiCh = T.chi(o.lamCh, ALPHA.c); o.NbCh = o.chiCh * Ach * fy / g1;
+  o.Mch = o.VEd * a / 4; o.MchRd = sec.Wel_z_ch * fy / g0;
+  o.u1 = !isFinite(o.MEd) ? Infinity : o.Nch / o.NbCh + o.Mch / o.MchRd;
+  // gałąź – wyboczenie względem osi materiałowej y–y na długości L_cr,y, z połową momentu M_y
+  o.Lcry = q.Lcry; o.lamY = q.Lcry > 0 && isFinite(q.Lcry) ? q.Lcry / sec.iy_ch / lam1 : 0; o.chiY = T.chi(o.lamY, ALPHA.c); o.NbY = o.chiY * Ach * fy / g1;
+  o.MyCh = Math.abs(q.MyEd || 0) / 2; o.kyy = q.kyy || 1; o.MyRdCh = sec.Wel_y_ch * fy / g1;
+  o.u2 = !isFinite(o.MEd) ? Infinity : o.Nch / o.NbY + o.kyy * o.MyCh / o.MyRdCh;
+  if (!o.pack) {
+    // przewiązki (dwie płaszczyzny): siła poprzeczna T_b = V_Ed·a/(n·h0), moment M_b = V_Ed·a/(2n)
+    const tb = sec.pt, bb = sec.pb;
+    o.Tb = o.VEd * a / (n * h0); o.Mb = o.VEd * a / (2 * n);
+    o.Wb = tb * bb * bb / 6; o.sb = o.Mb / o.Wb; o.tb = 1.5 * o.Tb / (tb * bb);
+    o.fyd = fy / g0; o.fvd = fy / (Math.sqrt(3) * g0);
+    o.sred = Math.sqrt(o.sb * o.sb + 3 * o.tb * o.tb);
+    o.ub = Math.max(o.sb / o.fyd, o.tb / o.fvd, o.sred / o.fyd);
+    // spoiny przewiązki z gałęzią: dwie spoiny wzdłuż zakładu c i jedna na krawędzi (długość b_b), grubość a_w – metoda sprężysta
+    const c = sec.pz, aw = sec.pw;
+    const Aw = aw * (2 * c + bb), uc = c * (c + bb) / (2 * c + bb);
+    const Iv = 2 * aw * c * (bb / 2) * (bb / 2) + aw * bb * bb * bb / 12;
+    const Iu = 2 * aw * (c * c * c / 12 + c * Math.pow(c / 2 - uc, 2)) + aw * bb * Math.pow(c - uc, 2);
+    const Ip = Iu + Iv;
+    const pts = [[0, bb / 2], [c, bb / 2], [0, -bb / 2], [c, -bb / 2]];
+    let tw = 0; pts.forEach(([u, v]) => { const tu = -o.Mb * v / Ip, tv = o.Tb / Aw + o.Mb * (u - uc) / Ip; tw = Math.max(tw, Math.hypot(tu, tv)); });
+    o.weld = { c, aw, Aw, uc, Ip, tw, bw: q.betaW || 0.9, fu: q.fu || 360 };
+    o.weld.fvw = o.weld.fu / (Math.sqrt(3) * o.weld.bw * g2);
+    o.uw = tw / o.weld.fvw;
+    o.nIb = n * o.Ib / h0; o.ich10 = 10 * Ich / a; o.stiffOk = o.nIb >= o.ich10;     // n·I_b/h0 ≥ 10·I_ch/a
+  }
+  o.panels = q.H > 0 ? q.H / a : Infinity;
+  return o;
 };
 // największe odchylenie od cięciwy odcinka (I rząd) – δ_x do zał. A
 T.chordDev = function (xs3, w, sg) {
