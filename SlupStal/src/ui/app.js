@@ -149,7 +149,7 @@ const GROUPS = [
     { k: 'wykonanie.CC', t: 'sel', l: 'Klasa konsekwencji', o: [['CC1', 'CC1'], ['CC2', 'CC2'], ['CC3', 'CC3']] },
     { k: 'wykonanie.EXC', t: 'sel', l: 'Klasa wykonania', o: [['auto', 'automatycznie (zał. C)'], ['EXC1', 'EXC1'], ['EXC2', 'EXC2'], ['EXC3', 'EXC3'], ['EXC4', 'EXC4']] },
     { k: 'wykonanie.korozja', t: 'sel', l: 'Kategoria korozyjności', o: ['C1', 'C2', 'C3', 'C4', 'C5', 'CX'].map(v => [v, v]) },
-    { t: 'html', h: () => `<div class="row wide"><span></span><span><button class="btn sm" data-act="ndp" type="button">Parametry krajowe (NDP) i normy…</button> <button class="btn sm" data-act="meta" type="button">Dane projektu…</button></span></div>` }
+    { t: 'html', h: () => `<div class="row wide"><span></span><span><button class="btn sm" data-act="ndp" type="button">Parametry krajowe (NDP) i normy…</button></span></div>` }
   ] }
 ];
 A.GROUPS = GROUPS;

@@ -172,6 +172,17 @@ const path = require('path'), fs = require('fs');
   await p.click('.tabs button[data-tab="data"]'); await p.waitForTimeout(300);
   await p.click('[data-badd]'); await p.waitForTimeout(900);
   ok('drugi słup w projekcie', (await p.$$('.btab')).length === 2);
+  // bez metryki projektu w Danych; klasy kotew do 10.9
+  ok('Dane bez metryki projektu (projektant, data – tylko „Strona tytułowa…” w Raporcie)', !(await p.$('#inputs [data-act="meta"]')) && !/Dane projektu/.test(await p.textContent('#inputs')));
+  await p.click('.tabs button[data-tab="report"]'); await p.waitForTimeout(800);
+  ok('Raport: przycisk „Strona tytułowa…”', !!(await p.$('#p-report #rMeta')));
+  await p.click('.tabs button[data-tab="data"]'); await p.waitForTimeout(300);
+  await p.evaluate(() => BS.A.basePopup()); await p.waitForTimeout(400);
+  ok('kotwy: klasy 4.6 … 10.9 w projektancie podstawy', (await p.$$eval('#modal select[data-k="podstawa.kotwy.kl"] option', o => o.map(x => x.value))).includes('10.9'));
+  await p.selectOption('#modal select[data-k="podstawa.kotwy.kl"]', '10.9'); await p.waitForTimeout(1500);
+  ok('kotwy kl. 10.9 – obliczenia bez błędów', await p.evaluate(() => BS.A.S().podstawa.kotwy.kl === '10.9' && !BS.A.R().errors.length));
+  await p.selectOption('#modal select[data-k="podstawa.kotwy.kl"]', '8.8'); await p.waitForTimeout(1200);
+  await p.click('#pOk'); await p.waitForTimeout(200);
   // przekrój z dwóch ceowników (6.4)
   await p.click('.tabs button[data-tab="data"]'); await p.waitForTimeout(300);
   await p.selectOption('select[data-k="przekroj.typ"]', 'dwuc'); await p.waitForTimeout(1500);

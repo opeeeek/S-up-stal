@@ -369,7 +369,7 @@ RP.tokBase = function (c, R, S) {
     case 'PBV':
       h += eq('F_{f,Rd}', 'C_{f,d}·N_{c,Ed}', `${fm(ndp.Cfd, 2)}·${kN(Math.max(0, r.N))}`, kN(r.FfRd), 'kN', '6.2.2(6) (6.1)');
       h += line(C.kotwyScin ? `kotwy przenoszą ścinanie (podkładki przyspawane / otwory normalne)` : 'kotwy nie przenoszą ścinania (otwory powiększone bez podkładek przyspawanych)');
-      if (C.kotwyScin) { h += eq('α_{bc}', '0,44 − 0,0003·f_{yb}', `0,44 − 0,0003·${fm(C.fyb, 0)}`, fm(C.abc, 4), '', '6.2.2(7)') + eq('F_{2,vb,Rd}', 'α_{bc}·f_{ub}·A_s/γ_{M2}', '', kN(C.F2vb), 'kN', '(6.3)') + eq('F_{1,vb,Rd}', 'docisk blachy (tabl. 3.4)', '', kN(C.F1vb), 'kN') + eq('F_{vb,Rd}', 'min(F_{1,vb,Rd}; F_{2,vb,Rd})', '', kN(C.Fvb), 'kN'); }
+      if (C.kotwyScin) { h += eq('α_{bc}', '0,44 − 0,0003·f_{yb}', `0,44 − 0,0003·${fm(C.fyb, 0)}`, fm(C.abc, 4), '', '6.2.2(7)') + eq('F_{2,vb,Rd}', 'α_{bc}·f_{ub}·A_s/γ_{M2}', C.fubV < C.fub ? `${fm(C.abc, 4)}·${fm(C.fubV, 0)}·${fm(C.As, 0)}/${fm(ndp.gM2, 2)} (f_{ub} ograniczone do 800 MPa – f_{yb} > 640 MPa)` : '', kN(C.F2vb), 'kN', '(6.3)') + eq('F_{1,vb,Rd}', 'docisk blachy (tabl. 3.4)', '', kN(C.F1vb), 'kN') + eq('F_{vb,Rd}', 'min(F_{1,vb,Rd}; F_{2,vb,Rd})', '', kN(C.Fvb), 'kN'); }
       h += eq('F_{v,Rd}', 'F_{f,Rd} + n·F_{vb,Rd}', `${kN(r.FfRd)} + ${C.kotwyScin ? C.nb : 0}·${kN(C.Fvb)}`, kN(r.FvRd), 'kN', '6.2.2(8) (6.2)');
       h += verd(kN(r.V), kN(r.FvRd), c.util, 'kN');
       break;
@@ -444,7 +444,7 @@ RP.build = function (S, R, opt) {
   const P = (s) => pre(gen) + ', ' + s;
   void P;
   let h = `<h1>Obliczenia statyczno-wytrzymałościowe słupa stalowego – ${esc(S.meta.nazwa)}</h1>`;
-  h += `<p>Obiekt: ${esc(S.meta.obiekt)}</p>`;
+  if (S.meta.obiekt) h += `<p>Obiekt: ${esc(S.meta.obiekt)}</p>`;
   if (S.meta.projektant || S.meta.sprawdzajacy) h += `<p>Projektant: ${esc(S.meta.projektant)}${S.meta.nrUprawnien ? ' (upr. ' + esc(S.meta.nrUprawnien) + ')' : ''}${S.meta.sprawdzajacy ? ' · Sprawdzający: ' + esc(S.meta.sprawdzajacy) : ''}${S.meta.data ? ' · Data: ' + esc(S.meta.data) : ''}</p>`;
   // 1. dane
   h += '<h2>1. Dane wejściowe</h2>';

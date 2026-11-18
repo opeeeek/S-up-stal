@@ -197,5 +197,17 @@ cfgs.forEach(([name, f]) => {
   const R6 = J.run(s6);
   ok('dobór podstawy: e ≥ 1,2·d₀, p ≥ 2,2/2,4·d₀, odstęp od słupa', !b.err && ['PBe', 'PBp', 'PBk'].every(id => st(id, R6) === 'ok'), b.err || `${b.lp}×${b.bp}, e_y = ${R6.pb.C.geo.eY}, e_z = ${R6.pb.C.geo.eZ}`);
 }
+/* 9. Klasy kotew – PN-EN 1993-1-8, tabl. 3.1; kl. 10.9 */
+{
+  const KL = BS.PB.KOTWY_KL;
+  ok('klasy kotew: 4.6, 4.8, 5.6, 5.8, 6.8, 8.8, 10.9 i pręty S235–S460', ['4.6', '4.8', '5.6', '5.8', '6.8', '8.8', '10.9', 'S235', 'S275', 'S355', 'S460'].every(k => KL[k]), Object.keys(KL).join(', '));
+  const s = J.defaultState(); s.podstawa.kotwy.kl = '10.9';
+  const R = J.run(s), C = R.pb.C, As = BS.M.SRUBY[s.podstawa.kotwy.d].As, g2 = R.ndp.gM2;
+  near('kl. 10.9: F_t,Rd = k₂·f_ub·A_s/γ_M2 (f_ub = 1000 MPa)', C.FtRd, 0.9 * 1000 * As / g2, 1e-9);
+  near('kl. 10.9: F_2,vb,Rd jak dla f_yb = 640, f_ub = 800 MPa (zakres 6.2.2(7))', C.F2vb, (0.44 - 0.0003 * 640) * 800 * As / g2, 1e-9);
+  ok('kl. 10.9: uwaga o cynkowaniu i ciągliwości, brak błędów', !R.errors.length && R.warnings.some(w => /10\.9/.test(w)));
+  const s2 = J.defaultState(); s2.podstawa.kotwy.kl = '6.8';
+  near('kl. 6.8: F_2,vb,Rd = (0,44 − 0,0003·480)·600·A_s/γ_M2', J.run(s2).pb.C.F2vb, (0.44 - 0.0003 * 480) * 600 * As / g2, 1e-9);
+}
 console.log(`\n${n - fails}/${n} testów zaliczonych`);
 process.exitCode = fails ? 1 : 0;

@@ -227,9 +227,10 @@ V.report = function (el) {
   if (!repOk()) { el.innerHTML = `<div class="rtools">${seg}</div>` + errBox(); bindSeg(); return; }
   let body;
   try { body = repBuild(); } catch (e) { console.error(e); body = `<div class="msg err">Błąd raportu: ${esc(e.message)}</div>`; }
-  el.innerHTML = `<div class="rtools">${seg}<span class="sp" style="flex:1"></span><label class="chk sm" title="Odwołania do punktów, tablic i wzorów norm w raporcie"><input type="checkbox" id="rRefs" ${refsOn() ? 'checked' : ''}><span>z odwołaniami do norm</span></label><button class="btn" id="rHtml" type="button" title="Raport HTML z danymi projektu (można go otworzyć w programie)">Zapisz raport HTML…</button><button class="btn" id="rOdt" type="button" title="OpenDocument Text (.odt) – LibreOffice Writer, MS Word">Zapisz .odt (edytowalny)…</button><button class="btn pri" id="rPrint" type="button" title="Drukowanie raportu (także zapis do PDF – drukarka „Microsoft Print to PDF” / „Zapisz jako PDF”)">Drukuj / zapisz PDF</button></div><div id="report">${wrapPrint(body)}</div>`;
+  el.innerHTML = `<div class="rtools">${seg}<span class="sp" style="flex:1"></span><label class="chk sm" title="Odwołania do punktów, tablic i wzorów norm w raporcie"><input type="checkbox" id="rRefs" ${refsOn() ? 'checked' : ''}><span>z odwołaniami do norm</span></label><button class="btn" id="rMeta" type="button" title="Obiekt, projektant, sprawdzający, data – tylko na stronie tytułowej raportu (opcjonalnie)">Strona tytułowa…</button><button class="btn" id="rHtml" type="button" title="Raport HTML z danymi projektu (można go otworzyć w programie)">Zapisz raport HTML…</button><button class="btn" id="rOdt" type="button" title="OpenDocument Text (.odt) – LibreOffice Writer, MS Word">Zapisz .odt (edytowalny)…</button><button class="btn pri" id="rPrint" type="button" title="Drukowanie raportu (także zapis do PDF – drukarka „Microsoft Print to PDF” / „Zapisz jako PDF”)">Drukuj / zapisz PDF</button></div><div id="report">${wrapPrint(body)}</div>`;
   bindSeg();
   $('#rHtml', el).onclick = () => V.exportHTML(); $('#rOdt', el).onclick = () => V.exportODT(); $('#rPrint', el).onclick = printNow;
+  $('#rMeta', el).onclick = () => A.metaPopup();
 };
 let ownT = 0;
 const OWN_ON = 'Raport własny – zapisywany w projekcie przy każdej zmianie; nie zmienia się po zmianie danych (aktualne obliczenia: „Wstaw raport pełny” / „Wstaw statykę”).';
@@ -237,7 +238,7 @@ function renderOwn(el, seg) {
   const own = S().meta.ownOn === true;
   if (!own && !repOk()) { el.innerHTML = `<div class="rtools">${seg}</div>` + errBox(); return; }
   const B = (cmd, lab, tit, val) => `<button data-oc="${cmd}"${val ? ` data-ov="${val}"` : ''} title="${tit}" type="button">${lab}</button>`;
-  el.innerHTML = `<div class="rtools">${seg}<span class="sp" style="flex:1"></span><button class="btn" id="oExp" type="button">Zapisz HTML…</button><button class="btn" id="oOdt" type="button" title="OpenDocument Text – LibreOffice Writer, MS Word">Zapisz .odt…</button><button class="btn pri" id="oPrint" type="button">Drukuj / PDF</button></div><div class="rtools owntools">
+  el.innerHTML = `<div class="rtools">${seg}<span class="sp" style="flex:1"></span><button class="btn" id="oMeta" type="button" title="Obiekt, projektant, data – do wstawienia w raporcie własnym przez „Wstaw raport pełny”">Strona tytułowa…</button><button class="btn" id="oExp" type="button">Zapisz HTML…</button><button class="btn" id="oOdt" type="button" title="OpenDocument Text – LibreOffice Writer, MS Word">Zapisz .odt…</button><button class="btn pri" id="oPrint" type="button">Drukuj / PDF</button></div><div class="rtools owntools">
       <span class="grp">${B('bold', '<b>B</b>', 'Pogrubienie (Ctrl+B)')}${B('italic', '<i>I</i>', 'Kursywa (Ctrl+I)')}${B('underline', '<u>U</u>', 'Podkreślenie (Ctrl+U)')}${B('removeFormat', 'T̸', 'Usuń formatowanie zaznaczenia')}</span>
       <span class="grp">${B('formatBlock', 'H1', 'Tytuł', 'h1')}${B('formatBlock', 'H2', 'Nagłówek rozdziału', 'h2')}${B('formatBlock', 'H3', 'Podtytuł', 'h3')}${B('formatBlock', '¶', 'Zwykły akapit', 'p')}${B('insertUnorderedList', '•', 'Lista punktowana')}${B('insertOrderedList', '1.', 'Lista numerowana')}</span>
       <span class="grp">${B('undo', '↶', 'Cofnij (Ctrl+Z)')}${B('redo', '↷', 'Ponów (Ctrl+Y)')}</span>
@@ -271,6 +272,7 @@ function renderOwn(el, seg) {
   $('#oReset', el).onclick = async () => { if (!(await Q.ask('Usunąć własne zmiany? Raport własny znowu pokaże bieżący raport obliczeń.', 'Przywróć', true))) return; S().meta.own = ''; S().meta.ownOn = false; A.markDirty(); rerender(); };
   $('#oClr', el).onclick = async () => { if (!(await Q.ask('Usunąć całą treść raportu własnego?', 'Wyczyść', true))) return; S().meta.own = ''; S().meta.ownOn = true; A.markDirty(); rerender(); };
   $('#oPrint', el).onclick = printNow;
+  $('#oMeta', el).onclick = () => A.metaPopup();
   $('#oExp', el).onclick = () => exportOwn('html');
   $('#oOdt', el).onclick = () => exportOwn('odt');
 }

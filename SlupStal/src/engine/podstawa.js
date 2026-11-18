@@ -17,10 +17,14 @@ const BS = root.BS, U = BS.U, M = BS.M;
 const PB = BS.PB = {};
 const s3 = Math.sqrt(3);
 
+// klasy śrub wg PN-EN 1993-1-8, tabl. 3.1 (f_yb, f_ub) – PN-EN ISO 898-1; pręty gwintowane ze stali konstrukcyjnej (PN-EN 10025)
 PB.KOTWY_KL = {
-  '4.6': { fyb: 240, fub: 400, n: 'śruba kl. 4.6 (PN-EN ISO 898-1)' }, '5.6': { fyb: 300, fub: 500, n: 'śruba kl. 5.6 (PN-EN ISO 898-1)' },
-  '8.8': { fyb: 640, fub: 800, n: 'śruba kl. 8.8 (PN-EN ISO 898-1)' },
-  'S235': { fyb: 235, fub: 360, n: 'pręt gwintowany ze stali S235' }, 'S355': { fyb: 355, fub: 490, n: 'pręt gwintowany ze stali S355' }
+  '4.6': { fyb: 240, fub: 400, n: 'śruba kl. 4.6 (PN-EN ISO 898-1)' }, '4.8': { fyb: 320, fub: 400, n: 'śruba kl. 4.8 (PN-EN ISO 898-1)' },
+  '5.6': { fyb: 300, fub: 500, n: 'śruba kl. 5.6 (PN-EN ISO 898-1)' }, '5.8': { fyb: 400, fub: 500, n: 'śruba kl. 5.8 (PN-EN ISO 898-1)' },
+  '6.8': { fyb: 480, fub: 600, n: 'śruba kl. 6.8 (PN-EN ISO 898-1)' }, '8.8': { fyb: 640, fub: 800, n: 'śruba kl. 8.8 (PN-EN ISO 898-1)' },
+  '10.9': { fyb: 900, fub: 1000, n: 'śruba kl. 10.9 (PN-EN ISO 898-1)', hi: true },
+  'S235': { fyb: 235, fub: 360, n: 'pręt gwintowany ze stali S235' }, 'S275': { fyb: 275, fub: 430, n: 'pręt gwintowany ze stali S275' },
+  'S355': { fyb: 355, fub: 490, n: 'pręt gwintowany ze stali S355' }, 'S460': { fyb: 460, fub: 540, n: 'pręt gwintowany ze stali S460' }
 };
 
 /* rozmieszczenie otworów kotew: odległości osi od krawędzi blachy e_y, e_z i rozstawy p wg tabl. 3.3;
@@ -157,8 +161,11 @@ PB.components = function (st, sec, base, ndp) {
   const geo = PB.geometry({ uk, nb, rows, w, zT, lp, bp, tp, d, d0, af, aw, sec });
   if (geo.inside) err.push('Podstawa: kotwa w obrysie słupa (przekrój zamknięty lub kotwa w ściance) – zmień układ lub rozstaw kotew.');
   // ścinanie kotwy (6.2.2(7)): F_2,vb,Rd = α_bc·f_ub·A_s/γM2, α_bc = 0,44 − 0,0003·f_yb; docisk blachy F_1,vb,Rd (tabl. 3.4)
+  // wzór na α_bc ważny dla 235 ≤ f_yb ≤ 640 MPa (6.2.2(7)); dla kl. 10.9 bezpiecznie: α_bc i f_ub jak dla f_yb = 640 MPa (kl. 8.8)
   const abc = 0.44 - 0.0003 * U.clamp(fyb, 235, 640);
-  const F2vb = abc * fub * As / g2;
+  const fubV = fyb > 640 ? Math.min(fub, 800) : fub;
+  const F2vb = abc * fubV * As / g2;
+  if (kl.hi) warn.push(`Kotwy kl. ${kt.kl}: ograniczona ciągliwość – nie stosować cynkowania ogniowego (kruchość wodorowa); nośność kotwy na ścinanie przyjęto jak dla f_yb = 640 MPa i f_ub = 800 MPa (wzór 6.2.2(7) ważny dla f_yb ≤ 640 MPa).`);
   const e1 = Math.max(eY, 1.2 * d0), e2 = eY;
   const ab = Math.min(e1 / (3 * d0), fub / fuP, 1), k1 = Math.min(2.8 * e2 / d0 - 1.7, 2.5);
   const F1vb = Math.max(0, k1) * ab * fuP * d * tp / g2;
@@ -180,7 +187,7 @@ PB.components = function (st, sec, base, ndp) {
     const kT = 1 / (1 / k15 + 1 / k16), kC = k13;
     stiff = { Ec, k13, k15, k16, kT, kC, z: zT + zC };
   }
-  return { err, warn, fixed, kind, lp, bp, tp, gat, fyP, fuP, fck, fcd, a1, b1, kj, kjMan, betaJ, fjd, tg, c, cz, cy, extZ, extY, Tf, Tw, Aeff, NjRd, FcplRd, FcfcRd, FC, zC, zT, d, As, fub, fyb, kl, FtRd, k2, uk, nb, rows, w, eY, d0, Tt, abc, F2vb, F1vb, Fvb, kotwyScin, af, aw, fvwd, bw, lwf, lww, h, b, tf, tw, stiff, kt, lb, geo, eAuto };
+  return { err, warn, fixed, kind, lp, bp, tp, gat, fyP, fuP, fck, fcd, a1, b1, kj, kjMan, betaJ, fjd, tg, c, cz, cy, extZ, extY, Tf, Tw, Aeff, NjRd, FcplRd, FcfcRd, FC, zC, zT, d, As, fub, fyb, kl, FtRd, k2, uk, nb, rows, w, eY, d0, Tt, abc, F2vb, F1vb, Fvb, kotwyScin, af, aw, fvwd, bw, lwf, lww, h, b, tf, tw, stiff, kt, lb, geo, eAuto, fubV };
 };
 
 /* M_j,Rd wg tabl. 6.7 (N > 0 – rozciąganie; M ≥ 0) – symetryczna podstawa */

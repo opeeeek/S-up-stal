@@ -338,7 +338,7 @@ A.ndpPopup = function () {
 A.metaPopup = function () {
   const st = S(), mt = st.meta;
   const fld = (k, l) => `<div class="row wide"><label>${l}</label><input class="txt" data-kt="meta.${k}" value="${esc(mt[k] || '')}"></div>`;
-  const m = Q.modal(`<h3>Dane projektu</h3>${fld('nazwa', 'Nazwa elementu')}${fld('obiekt', 'Obiekt')}${fld('projektant', 'Projektant')}${fld('nrUprawnien', 'Nr uprawnień')}${fld('sprawdzajacy', 'Sprawdzający')}${fld('data', 'Data')}<div class="row wide"><label>Opis</label><textarea class="txt" data-kt="meta.opis" rows="4" style="height:auto">${esc(mt.opis || '')}</textarea></div><div class="dbtn"><button class="btn pri" id="mOk" type="button">Zamknij</button></div>`, 'nofocus');
+  const m = Q.modal(`<h3>Strona tytułowa raportu</h3><p class="hint">Dane opcjonalne – pojawiają się tylko w nagłówku raportu (puste pola są pomijane).</p>${fld('nazwa', 'Nazwa elementu')}${fld('obiekt', 'Obiekt')}${fld('projektant', 'Projektant')}${fld('nrUprawnien', 'Nr uprawnień')}${fld('sprawdzajacy', 'Sprawdzający')}${fld('data', 'Data')}<div class="row wide"><label>Opis</label><textarea class="txt" data-kt="meta.opis" rows="4" style="height:auto">${esc(mt.opis || '')}</textarea></div><div class="dbtn"><button class="btn pri" id="mOk" type="button">Zamknij</button></div>`, 'nofocus');
   A.bindFields(m);
   $('#mOk', m).onclick = () => { $('#projName').value = st.meta.nazwa; closeM(); A.changed(false); };
 };

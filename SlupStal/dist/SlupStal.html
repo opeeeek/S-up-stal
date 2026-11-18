@@ -3713,10 +3713,14 @@ const BS = root.BS, U = BS.U, M = BS.M;
 const PB = BS.PB = {};
 const s3 = Math.sqrt(3);
 
+// klasy śrub wg PN-EN 1993-1-8, tabl. 3.1 (f_yb, f_ub) – PN-EN ISO 898-1; pręty gwintowane ze stali konstrukcyjnej (PN-EN 10025)
 PB.KOTWY_KL = {
-  '4.6': { fyb: 240, fub: 400, n: 'śruba kl. 4.6 (PN-EN ISO 898-1)' }, '5.6': { fyb: 300, fub: 500, n: 'śruba kl. 5.6 (PN-EN ISO 898-1)' },
-  '8.8': { fyb: 640, fub: 800, n: 'śruba kl. 8.8 (PN-EN ISO 898-1)' },
-  'S235': { fyb: 235, fub: 360, n: 'pręt gwintowany ze stali S235' }, 'S355': { fyb: 355, fub: 490, n: 'pręt gwintowany ze stali S355' }
+  '4.6': { fyb: 240, fub: 400, n: 'śruba kl. 4.6 (PN-EN ISO 898-1)' }, '4.8': { fyb: 320, fub: 400, n: 'śruba kl. 4.8 (PN-EN ISO 898-1)' },
+  '5.6': { fyb: 300, fub: 500, n: 'śruba kl. 5.6 (PN-EN ISO 898-1)' }, '5.8': { fyb: 400, fub: 500, n: 'śruba kl. 5.8 (PN-EN ISO 898-1)' },
+  '6.8': { fyb: 480, fub: 600, n: 'śruba kl. 6.8 (PN-EN ISO 898-1)' }, '8.8': { fyb: 640, fub: 800, n: 'śruba kl. 8.8 (PN-EN ISO 898-1)' },
+  '10.9': { fyb: 900, fub: 1000, n: 'śruba kl. 10.9 (PN-EN ISO 898-1)', hi: true },
+  'S235': { fyb: 235, fub: 360, n: 'pręt gwintowany ze stali S235' }, 'S275': { fyb: 275, fub: 430, n: 'pręt gwintowany ze stali S275' },
+  'S355': { fyb: 355, fub: 490, n: 'pręt gwintowany ze stali S355' }, 'S460': { fyb: 460, fub: 540, n: 'pręt gwintowany ze stali S460' }
 };
 
 /* rozmieszczenie otworów kotew: odległości osi od krawędzi blachy e_y, e_z i rozstawy p wg tabl. 3.3;
@@ -3853,8 +3857,11 @@ PB.components = function (st, sec, base, ndp) {
   const geo = PB.geometry({ uk, nb, rows, w, zT, lp, bp, tp, d, d0, af, aw, sec });
   if (geo.inside) err.push('Podstawa: kotwa w obrysie słupa (przekrój zamknięty lub kotwa w ściance) – zmień układ lub rozstaw kotew.');
   // ścinanie kotwy (6.2.2(7)): F_2,vb,Rd = α_bc·f_ub·A_s/γM2, α_bc = 0,44 − 0,0003·f_yb; docisk blachy F_1,vb,Rd (tabl. 3.4)
+  // wzór na α_bc ważny dla 235 ≤ f_yb ≤ 640 MPa (6.2.2(7)); dla kl. 10.9 bezpiecznie: α_bc i f_ub jak dla f_yb = 640 MPa (kl. 8.8)
   const abc = 0.44 - 0.0003 * U.clamp(fyb, 235, 640);
-  const F2vb = abc * fub * As / g2;
+  const fubV = fyb > 640 ? Math.min(fub, 800) : fub;
+  const F2vb = abc * fubV * As / g2;
+  if (kl.hi) warn.push(`Kotwy kl. ${kt.kl}: ograniczona ciągliwość – nie stosować cynkowania ogniowego (kruchość wodorowa); nośność kotwy na ścinanie przyjęto jak dla f_yb = 640 MPa i f_ub = 800 MPa (wzór 6.2.2(7) ważny dla f_yb ≤ 640 MPa).`);
   const e1 = Math.max(eY, 1.2 * d0), e2 = eY;
   const ab = Math.min(e1 / (3 * d0), fub / fuP, 1), k1 = Math.min(2.8 * e2 / d0 - 1.7, 2.5);
   const F1vb = Math.max(0, k1) * ab * fuP * d * tp / g2;
@@ -3876,7 +3883,7 @@ PB.components = function (st, sec, base, ndp) {
     const kT = 1 / (1 / k15 + 1 / k16), kC = k13;
     stiff = { Ec, k13, k15, k16, kT, kC, z: zT + zC };
   }
-  return { err, warn, fixed, kind, lp, bp, tp, gat, fyP, fuP, fck, fcd, a1, b1, kj, kjMan, betaJ, fjd, tg, c, cz, cy, extZ, extY, Tf, Tw, Aeff, NjRd, FcplRd, FcfcRd, FC, zC, zT, d, As, fub, fyb, kl, FtRd, k2, uk, nb, rows, w, eY, d0, Tt, abc, F2vb, F1vb, Fvb, kotwyScin, af, aw, fvwd, bw, lwf, lww, h, b, tf, tw, stiff, kt, lb, geo, eAuto };
+  return { err, warn, fixed, kind, lp, bp, tp, gat, fyP, fuP, fck, fcd, a1, b1, kj, kjMan, betaJ, fjd, tg, c, cz, cy, extZ, extY, Tf, Tw, Aeff, NjRd, FcplRd, FcfcRd, FC, zC, zT, d, As, fub, fyb, kl, FtRd, k2, uk, nb, rows, w, eY, d0, Tt, abc, F2vb, F1vb, Fvb, kotwyScin, af, aw, fvwd, bw, lwf, lww, h, b, tf, tw, stiff, kt, lb, geo, eAuto, fubV };
 };
 
 /* M_j,Rd wg tabl. 6.7 (N > 0 – rozciąganie; M ≥ 0) – symetryczna podstawa */
@@ -4670,7 +4677,7 @@ J.designBase = function (st, R, eta) {
   const sec = R.sec, ndp = R.ndp, lim = (eta || 100) / 100;
   const o = st.podstawa, fixed = o.typ === 'sztywna' && sec.kind !== 'CHS';
   const h = sec.h, b = sec.kind === 'I' ? Math.max(sec.bg, sec.bd) : sec.b;
-  const ds = ['M16', 'M20', 'M24', 'M27', 'M30', 'M36', 'M42', 'M48'], kls = ['5.6', '8.8'];
+  const ds = ['M16', 'M20', 'M24', 'M27', 'M30', 'M36', 'M42', 'M48'], kls = ['5.6', '8.8', '10.9'];
   const tps = [15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80];
   let best = null;
   const forces = R.baseForces;
@@ -4699,7 +4706,7 @@ J.designBase = function (st, R, eta) {
             const AS = [4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 20];
             const af = AS.find(a => a >= C.af * uf / lim - 1e-9 && a >= 4) || null, aw = AS.find(a => a >= C.aw * uw / lim - 1e-9 && a >= 4) || null;
             if (!af || !aw || af > 0.7 * tmin + 1e-9 || aw > 0.7 * Math.min(sec.tw || sec.t, tp) + 1e-9) continue;
-            const cost = 7.85e-6 * lp * bp * tp + (fixed ? 4 : C.nb) * BS.M.SRUBY[dn].As * (kl === '8.8' ? 1.6 : 1) * 0.004 + 0.02 * (af * af * C.lwf * 2 + aw * aw * C.lww) * 7.85e-6;
+            const cost = 7.85e-6 * lp * bp * tp + (fixed ? 4 : C.nb) * BS.M.SRUBY[dn].As * (kl === '10.9' ? 2.0 : kl === '8.8' ? 1.6 : 1) * 0.004 + 0.02 * (af * af * C.lwf * 2 + aw * aw * C.lww) * 7.85e-6;
             if (!best || cost < best.cost) best = { lp, bp, tp, d: dn, kl, ez, w, u: Math.max(u, uf * C.af / af, uw * C.aw / aw), cost, af, aw, uklad: s2.podstawa.kotwy.uklad };
             break;
           }
@@ -5841,7 +5848,7 @@ RP.tokBase = function (c, R, S) {
     case 'PBV':
       h += eq('F_{f,Rd}', 'C_{f,d}·N_{c,Ed}', `${fm(ndp.Cfd, 2)}·${kN(Math.max(0, r.N))}`, kN(r.FfRd), 'kN', '6.2.2(6) (6.1)');
       h += line(C.kotwyScin ? `kotwy przenoszą ścinanie (podkładki przyspawane / otwory normalne)` : 'kotwy nie przenoszą ścinania (otwory powiększone bez podkładek przyspawanych)');
-      if (C.kotwyScin) { h += eq('α_{bc}', '0,44 − 0,0003·f_{yb}', `0,44 − 0,0003·${fm(C.fyb, 0)}`, fm(C.abc, 4), '', '6.2.2(7)') + eq('F_{2,vb,Rd}', 'α_{bc}·f_{ub}·A_s/γ_{M2}', '', kN(C.F2vb), 'kN', '(6.3)') + eq('F_{1,vb,Rd}', 'docisk blachy (tabl. 3.4)', '', kN(C.F1vb), 'kN') + eq('F_{vb,Rd}', 'min(F_{1,vb,Rd}; F_{2,vb,Rd})', '', kN(C.Fvb), 'kN'); }
+      if (C.kotwyScin) { h += eq('α_{bc}', '0,44 − 0,0003·f_{yb}', `0,44 − 0,0003·${fm(C.fyb, 0)}`, fm(C.abc, 4), '', '6.2.2(7)') + eq('F_{2,vb,Rd}', 'α_{bc}·f_{ub}·A_s/γ_{M2}', C.fubV < C.fub ? `${fm(C.abc, 4)}·${fm(C.fubV, 0)}·${fm(C.As, 0)}/${fm(ndp.gM2, 2)} (f_{ub} ograniczone do 800 MPa – f_{yb} > 640 MPa)` : '', kN(C.F2vb), 'kN', '(6.3)') + eq('F_{1,vb,Rd}', 'docisk blachy (tabl. 3.4)', '', kN(C.F1vb), 'kN') + eq('F_{vb,Rd}', 'min(F_{1,vb,Rd}; F_{2,vb,Rd})', '', kN(C.Fvb), 'kN'); }
       h += eq('F_{v,Rd}', 'F_{f,Rd} + n·F_{vb,Rd}', `${kN(r.FfRd)} + ${C.kotwyScin ? C.nb : 0}·${kN(C.Fvb)}`, kN(r.FvRd), 'kN', '6.2.2(8) (6.2)');
       h += verd(kN(r.V), kN(r.FvRd), c.util, 'kN');
       break;
@@ -5916,7 +5923,7 @@ RP.build = function (S, R, opt) {
   const P = (s) => pre(gen) + ', ' + s;
   void P;
   let h = `<h1>Obliczenia statyczno-wytrzymałościowe słupa stalowego – ${esc(S.meta.nazwa)}</h1>`;
-  h += `<p>Obiekt: ${esc(S.meta.obiekt)}</p>`;
+  if (S.meta.obiekt) h += `<p>Obiekt: ${esc(S.meta.obiekt)}</p>`;
   if (S.meta.projektant || S.meta.sprawdzajacy) h += `<p>Projektant: ${esc(S.meta.projektant)}${S.meta.nrUprawnien ? ' (upr. ' + esc(S.meta.nrUprawnien) + ')' : ''}${S.meta.sprawdzajacy ? ' · Sprawdzający: ' + esc(S.meta.sprawdzajacy) : ''}${S.meta.data ? ' · Data: ' + esc(S.meta.data) : ''}</p>`;
   // 1. dane
   h += '<h2>1. Dane wejściowe</h2>';
@@ -6319,7 +6326,7 @@ const GROUPS = [
     { k: 'wykonanie.CC', t: 'sel', l: 'Klasa konsekwencji', o: [['CC1', 'CC1'], ['CC2', 'CC2'], ['CC3', 'CC3']] },
     { k: 'wykonanie.EXC', t: 'sel', l: 'Klasa wykonania', o: [['auto', 'automatycznie (zał. C)'], ['EXC1', 'EXC1'], ['EXC2', 'EXC2'], ['EXC3', 'EXC3'], ['EXC4', 'EXC4']] },
     { k: 'wykonanie.korozja', t: 'sel', l: 'Kategoria korozyjności', o: ['C1', 'C2', 'C3', 'C4', 'C5', 'CX'].map(v => [v, v]) },
-    { t: 'html', h: () => `<div class="row wide"><span></span><span><button class="btn sm" data-act="ndp" type="button">Parametry krajowe (NDP) i normy…</button> <button class="btn sm" data-act="meta" type="button">Dane projektu…</button></span></div>` }
+    { t: 'html', h: () => `<div class="row wide"><span></span><span><button class="btn sm" data-act="ndp" type="button">Parametry krajowe (NDP) i normy…</button></span></div>` }
   ] }
 ];
 A.GROUPS = GROUPS;
@@ -7289,7 +7296,7 @@ A.ndpPopup = function () {
 A.metaPopup = function () {
   const st = S(), mt = st.meta;
   const fld = (k, l) => `<div class="row wide"><label>${l}</label><input class="txt" data-kt="meta.${k}" value="${esc(mt[k] || '')}"></div>`;
-  const m = Q.modal(`<h3>Dane projektu</h3>${fld('nazwa', 'Nazwa elementu')}${fld('obiekt', 'Obiekt')}${fld('projektant', 'Projektant')}${fld('nrUprawnien', 'Nr uprawnień')}${fld('sprawdzajacy', 'Sprawdzający')}${fld('data', 'Data')}<div class="row wide"><label>Opis</label><textarea class="txt" data-kt="meta.opis" rows="4" style="height:auto">${esc(mt.opis || '')}</textarea></div><div class="dbtn"><button class="btn pri" id="mOk" type="button">Zamknij</button></div>`, 'nofocus');
+  const m = Q.modal(`<h3>Strona tytułowa raportu</h3><p class="hint">Dane opcjonalne – pojawiają się tylko w nagłówku raportu (puste pola są pomijane).</p>${fld('nazwa', 'Nazwa elementu')}${fld('obiekt', 'Obiekt')}${fld('projektant', 'Projektant')}${fld('nrUprawnien', 'Nr uprawnień')}${fld('sprawdzajacy', 'Sprawdzający')}${fld('data', 'Data')}<div class="row wide"><label>Opis</label><textarea class="txt" data-kt="meta.opis" rows="4" style="height:auto">${esc(mt.opis || '')}</textarea></div><div class="dbtn"><button class="btn pri" id="mOk" type="button">Zamknij</button></div>`, 'nofocus');
   A.bindFields(m);
   $('#mOk', m).onclick = () => { $('#projName').value = st.meta.nazwa; closeM(); A.changed(false); };
 };
@@ -8107,9 +8114,10 @@ V.report = function (el) {
   if (!repOk()) { el.innerHTML = `<div class="rtools">${seg}</div>` + errBox(); bindSeg(); return; }
   let body;
   try { body = repBuild(); } catch (e) { console.error(e); body = `<div class="msg err">Błąd raportu: ${esc(e.message)}</div>`; }
-  el.innerHTML = `<div class="rtools">${seg}<span class="sp" style="flex:1"></span><label class="chk sm" title="Odwołania do punktów, tablic i wzorów norm w raporcie"><input type="checkbox" id="rRefs" ${refsOn() ? 'checked' : ''}><span>z odwołaniami do norm</span></label><button class="btn" id="rHtml" type="button" title="Raport HTML z danymi projektu (można go otworzyć w programie)">Zapisz raport HTML…</button><button class="btn" id="rOdt" type="button" title="OpenDocument Text (.odt) – LibreOffice Writer, MS Word">Zapisz .odt (edytowalny)…</button><button class="btn pri" id="rPrint" type="button" title="Drukowanie raportu (także zapis do PDF – drukarka „Microsoft Print to PDF” / „Zapisz jako PDF”)">Drukuj / zapisz PDF</button></div><div id="report">${wrapPrint(body)}</div>`;
+  el.innerHTML = `<div class="rtools">${seg}<span class="sp" style="flex:1"></span><label class="chk sm" title="Odwołania do punktów, tablic i wzorów norm w raporcie"><input type="checkbox" id="rRefs" ${refsOn() ? 'checked' : ''}><span>z odwołaniami do norm</span></label><button class="btn" id="rMeta" type="button" title="Obiekt, projektant, sprawdzający, data – tylko na stronie tytułowej raportu (opcjonalnie)">Strona tytułowa…</button><button class="btn" id="rHtml" type="button" title="Raport HTML z danymi projektu (można go otworzyć w programie)">Zapisz raport HTML…</button><button class="btn" id="rOdt" type="button" title="OpenDocument Text (.odt) – LibreOffice Writer, MS Word">Zapisz .odt (edytowalny)…</button><button class="btn pri" id="rPrint" type="button" title="Drukowanie raportu (także zapis do PDF – drukarka „Microsoft Print to PDF” / „Zapisz jako PDF”)">Drukuj / zapisz PDF</button></div><div id="report">${wrapPrint(body)}</div>`;
   bindSeg();
   $('#rHtml', el).onclick = () => V.exportHTML(); $('#rOdt', el).onclick = () => V.exportODT(); $('#rPrint', el).onclick = printNow;
+  $('#rMeta', el).onclick = () => A.metaPopup();
 };
 let ownT = 0;
 const OWN_ON = 'Raport własny – zapisywany w projekcie przy każdej zmianie; nie zmienia się po zmianie danych (aktualne obliczenia: „Wstaw raport pełny” / „Wstaw statykę”).';
@@ -8117,7 +8125,7 @@ function renderOwn(el, seg) {
   const own = S().meta.ownOn === true;
   if (!own && !repOk()) { el.innerHTML = `<div class="rtools">${seg}</div>` + errBox(); return; }
   const B = (cmd, lab, tit, val) => `<button data-oc="${cmd}"${val ? ` data-ov="${val}"` : ''} title="${tit}" type="button">${lab}</button>`;
-  el.innerHTML = `<div class="rtools">${seg}<span class="sp" style="flex:1"></span><button class="btn" id="oExp" type="button">Zapisz HTML…</button><button class="btn" id="oOdt" type="button" title="OpenDocument Text – LibreOffice Writer, MS Word">Zapisz .odt…</button><button class="btn pri" id="oPrint" type="button">Drukuj / PDF</button></div><div class="rtools owntools">
+  el.innerHTML = `<div class="rtools">${seg}<span class="sp" style="flex:1"></span><button class="btn" id="oMeta" type="button" title="Obiekt, projektant, data – do wstawienia w raporcie własnym przez „Wstaw raport pełny”">Strona tytułowa…</button><button class="btn" id="oExp" type="button">Zapisz HTML…</button><button class="btn" id="oOdt" type="button" title="OpenDocument Text – LibreOffice Writer, MS Word">Zapisz .odt…</button><button class="btn pri" id="oPrint" type="button">Drukuj / PDF</button></div><div class="rtools owntools">
       <span class="grp">${B('bold', '<b>B</b>', 'Pogrubienie (Ctrl+B)')}${B('italic', '<i>I</i>', 'Kursywa (Ctrl+I)')}${B('underline', '<u>U</u>', 'Podkreślenie (Ctrl+U)')}${B('removeFormat', 'T̸', 'Usuń formatowanie zaznaczenia')}</span>
       <span class="grp">${B('formatBlock', 'H1', 'Tytuł', 'h1')}${B('formatBlock', 'H2', 'Nagłówek rozdziału', 'h2')}${B('formatBlock', 'H3', 'Podtytuł', 'h3')}${B('formatBlock', '¶', 'Zwykły akapit', 'p')}${B('insertUnorderedList', '•', 'Lista punktowana')}${B('insertOrderedList', '1.', 'Lista numerowana')}</span>
       <span class="grp">${B('undo', '↶', 'Cofnij (Ctrl+Z)')}${B('redo', '↷', 'Ponów (Ctrl+Y)')}</span>
@@ -8151,6 +8159,7 @@ function renderOwn(el, seg) {
   $('#oReset', el).onclick = async () => { if (!(await Q.ask('Usunąć własne zmiany? Raport własny znowu pokaże bieżący raport obliczeń.', 'Przywróć', true))) return; S().meta.own = ''; S().meta.ownOn = false; A.markDirty(); rerender(); };
   $('#oClr', el).onclick = async () => { if (!(await Q.ask('Usunąć całą treść raportu własnego?', 'Wyczyść', true))) return; S().meta.own = ''; S().meta.ownOn = true; A.markDirty(); rerender(); };
   $('#oPrint', el).onclick = printNow;
+  $('#oMeta', el).onclick = () => A.metaPopup();
   $('#oExp', el).onclick = () => exportOwn('html');
   $('#oOdt', el).onclick = () => exportOwn('odt');
 }

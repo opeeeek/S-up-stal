@@ -485,7 +485,7 @@ J.designBase = function (st, R, eta) {
   const sec = R.sec, ndp = R.ndp, lim = (eta || 100) / 100;
   const o = st.podstawa, fixed = o.typ === 'sztywna' && sec.kind !== 'CHS';
   const h = sec.h, b = sec.kind === 'I' ? Math.max(sec.bg, sec.bd) : sec.b;
-  const ds = ['M16', 'M20', 'M24', 'M27', 'M30', 'M36', 'M42', 'M48'], kls = ['5.6', '8.8'];
+  const ds = ['M16', 'M20', 'M24', 'M27', 'M30', 'M36', 'M42', 'M48'], kls = ['5.6', '8.8', '10.9'];
   const tps = [15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80];
   let best = null;
   const forces = R.baseForces;
@@ -514,7 +514,7 @@ J.designBase = function (st, R, eta) {
             const AS = [4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 20];
             const af = AS.find(a => a >= C.af * uf / lim - 1e-9 && a >= 4) || null, aw = AS.find(a => a >= C.aw * uw / lim - 1e-9 && a >= 4) || null;
             if (!af || !aw || af > 0.7 * tmin + 1e-9 || aw > 0.7 * Math.min(sec.tw || sec.t, tp) + 1e-9) continue;
-            const cost = 7.85e-6 * lp * bp * tp + (fixed ? 4 : C.nb) * BS.M.SRUBY[dn].As * (kl === '8.8' ? 1.6 : 1) * 0.004 + 0.02 * (af * af * C.lwf * 2 + aw * aw * C.lww) * 7.85e-6;
+            const cost = 7.85e-6 * lp * bp * tp + (fixed ? 4 : C.nb) * BS.M.SRUBY[dn].As * (kl === '10.9' ? 2.0 : kl === '8.8' ? 1.6 : 1) * 0.004 + 0.02 * (af * af * C.lwf * 2 + aw * aw * C.lww) * 7.85e-6;
             if (!best || cost < best.cost) best = { lp, bp, tp, d: dn, kl, ez, w, u: Math.max(u, uf * C.af / af, uw * C.aw / aw), cost, af, aw, uklad: s2.podstawa.kotwy.uklad };
             break;
           }
