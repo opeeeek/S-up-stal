@@ -106,9 +106,9 @@ cfgs.forEach(([name, f]) => {
   const t = Date.now();
   try { R = J.run(s); } catch (e) { err = e; }
   if (err) { ok(name, false, 'wyjątek: ' + err.message + '\n' + err.stack.split('\n').slice(1, 3).join('\n')); return; }
-  const badU = R.checks.filter(c => !c.info && c.id !== 'PBG' && (c.util === null || !isFinite(c.util)));
   // niedopasowana geometria podstawy (zmiana przekroju) – dobór podstawy musi ją naprawić
   if (R.checks.some(c => c.id === 'PBG')) { const b = J.designBase(s, R, 100); if (!b.err) { Object.assign(s.podstawa, { lp: b.lp, bp: b.bp, tp: b.tp, spoiny: { pas: b.af, srodnik: b.aw } }); Object.assign(s.podstawa.kotwy, { d: b.d, kl: b.kl, ez: b.ez, w: b.w, uklad: b.uklad }); R = J.run(s); } }
+  const badU = R.checks.filter(c => !c.info && c.id !== 'PBG' && (c.util === null || !isFinite(c.util)));
   const html = (() => { try { return 'ok'; } catch (e) { return e.message; } })();
   ok(name, !R.errors.length && !badU.length && !R.checks.some(c => c.id === 'PBG'), `${R.errors.join('; ')}${badU.map(c => c.n).join(', ')} · η = ${(R.uMax * 100).toFixed(0)}% · ${R.checks.length} spr. · ${Date.now() - t} ms${R.warnings.length ? ' · uwagi: ' + R.warnings.length : ''}`);
   void html;
@@ -170,6 +170,32 @@ cfgs.forEach(([name, f]) => {
   const s4 = J.defaultState(); s4.przekroj = { typ: 'dwuc', seria: 'UPN', nr: 300, uklad: 'zew', a: '' };
   const r4 = J.designSection(s4, 90);
   ok('dobór 2×UPN (η ≤ 90%)', !r4.err && J.passes(J.run(Object.assign(U.clone(s4), { przekroj: r4.d })), 90, 'sec'), r4.err || `2×${r4.d.seria} ${r4.d.nr}`);
+}
+/* 8. Rozmieszczenie otworów kotew – PN-EN 1993-1-8, tabl. 3.3; odstęp kotew od słupa */
+{
+  const s = J.defaultState();                       // HEA 280, blacha 480×360, 4 kotwy poza pasami
+  const R = J.run(s), g = R.pb.C.geo, d0 = BS.M.d0Kotwy(BS.M.SRUBY[s.podstawa.kotwy.d].d);
+  near('otwory: e_min = 1,2·d₀', g.eMin, 1.2 * d0, 1e-12);
+  near('otwory: p₁,min = 2,2·d₀, p₂,min = 2,4·d₀', g.p1Min + g.p2Min, 4.6 * d0, 1e-12);
+  near('otwory: e_y = (b_p − w)/2', g.eY, (U.num(s.podstawa.bp) - U.num(s.podstawa.kotwy.w)) / 2, 1e-12);
+  near('otwory: e_z = l_p/2 − z_T (= e_z zadane)', g.eZ, U.num(s.podstawa.kotwy.ez), 1e-12);
+  near('odstęp od słupa = z_T − h/2 (lico pasa)', g.clr, U.num(s.podstawa.lp) / 2 - U.num(s.podstawa.kotwy.ez) - R.sec.h / 2, 1e-6);
+  const st = (id, RR) => (RR.checks.find(c => c.id === id) || {}).status;
+  ok('otwory: układ domyślny spełnia tabl. 3.3 i odstęp od słupa', st('PBe', R) === 'ok' && st('PBp', R) === 'ok' && st('PBk', R) === 'ok');
+  const s2 = U.clone(s); s2.podstawa.kotwy.w = U.num(s.podstawa.bp) - 2 * 30;      // e_y = 30 mm < 1,2·d₀
+  ok('otwory: e_y = 30 mm < 1,2·d₀ → warunek niespełniony', st('PBe', J.run(s2)) === 'fail');
+  const s3 = U.clone(s); s3.podstawa.kotwy.w = 2 * d0;                               // rozstaw w rzędzie < 2,4·d₀
+  ok('otwory: p₂ < 2,4·d₀ → warunek niespełniony', st('PBp', J.run(s3)) === 'fail');
+  const s4 = U.clone(s); s4.podstawa.kotwy.ez = (U.num(s.podstawa.lp) - R.sec.h) / 2 - 20;   // kotwa 20 mm od lica pasa
+  ok('kotwa 20 mm od lica pasa → odstęp od słupa niespełniony', st('PBk', J.run(s4)) === 'fail');
+  const s5 = J.defaultState(); s5.przekroj = { typ: 'rura', seria: 'SHS', nr: '200x10', wyk: 'gor' }; s5.podstawa.typ = 'przegub'; Object.assign(s5.podstawa.kotwy, { uklad: 'wew', w: 120, p: 120 }); s5.podpory.dol.y = 'prz'; s5.podpory.gora.y = 'prz';
+  const R5 = J.run(s5);
+  ok('kotwy wewnątrz rury → błąd geometrii (układ niewykonalny)', R5.pb && R5.pb.C.geo.inside && R5.checks.some(c => c.id === 'PBG'));
+  // dobór podstawy zachowuje minimalne odległości i rozstawy
+  const b = J.designBase(s, R, 90);
+  const s6 = U.clone(s); Object.assign(s6.podstawa, { lp: b.lp, bp: b.bp, tp: b.tp, spoiny: { pas: b.af, srodnik: b.aw } }); Object.assign(s6.podstawa.kotwy, { d: b.d, kl: b.kl, ez: b.ez, w: b.w, uklad: b.uklad });
+  const R6 = J.run(s6);
+  ok('dobór podstawy: e ≥ 1,2·d₀, p ≥ 2,2/2,4·d₀, odstęp od słupa', !b.err && ['PBe', 'PBp', 'PBk'].every(id => st(id, R6) === 'ok'), b.err || `${b.lp}×${b.bp}, e_y = ${R6.pb.C.geo.eY}, e_z = ${R6.pb.C.geo.eZ}`);
 }
 console.log(`\n${n - fails}/${n} testów zaliczonych`);
 process.exitCode = fails ? 1 : 0;

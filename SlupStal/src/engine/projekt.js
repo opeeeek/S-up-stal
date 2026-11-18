@@ -342,6 +342,12 @@ J.run = function (st0, opt) {
     if (C) {
       C.warn.forEach(wrn);
       out.pb = { C, worst: {} };
+      if (C.geo) {
+        const GB0 = 'Podstawa słupa (PN-EN 1993-1-8)', g = C.geo;
+        out.checks.push(BS.check({ id: 'PBe', grp: GB0, n: `Odległości osi otworów od krawędzi blachy: e_y = ${U.fmt(g.eY, 0)} mm, e_z = ${U.fmt(g.eZ, 0)} mm ≥ 1,2·d₀`, ref: 'PN-EN 1993-1-8, tabl. 3.3', Ed: g.eMin, Rd: g.eGov, unit: 'mm', util: g.uE, d: { C } }));
+        out.checks.push(BS.check({ id: 'PBp', grp: GB0, n: `Rozstaw otworów kotew: p₂ = ${U.fmt(g.pY, 0)} mm ≥ 2,4·d₀${g.pZ !== null ? `, p₁ = ${U.fmt(g.pZ, 0)} mm ≥ 2,2·d₀` : ''}`, ref: 'PN-EN 1993-1-8, tabl. 3.3', Ed: g.pZ !== null && g.p1Min / g.pZ > g.p2Min / g.pY ? g.p1Min : g.p2Min, Rd: g.pZ !== null && g.p1Min / g.pZ > g.p2Min / g.pY ? g.pZ : g.pY, unit: 'mm', util: g.uP, d: { C } }));
+        if (!g.inside) out.checks.push(BS.check({ id: 'PBk', grp: GB0, n: `Odstęp osi kotwy od słupa (podkładka Ø ≈ 2d poza spoiną, luz montażowy): ${g.inside ? 'kotwa w obrysie słupa' : U.fmt(g.clr, 0) + ' mm'}`, ref: 'zasada konstrukcyjna; PN-EN 1090-2', Ed: g.cReq, Rd: g.clr, unit: 'mm', util: g.uK, d: { C } }));
+      }
       if (C.err.length) out.checks.push(BS.check({ id: 'PBG', grp: 'Podstawa słupa (PN-EN 1993-1-8)', n: 'Geometria podstawy: ' + C.err.map(e => e.replace(/^Podstawa: /, '')).join(' '), ref: 'PN-EN 1993-1-8, 6.2.5, tabl. 3.3', Ed: 1, Rd: 0, unit: '-', util: Infinity, forceStatus: 'fail', d: { C } }));
       if (!C.err.length) {
         const fixedModel = md.bc.dol.y === 'utw' || md.bc.dol.z === 'utw' || !!out.baseSpring;
@@ -484,19 +490,22 @@ J.designBase = function (st, R, eta) {
   let best = null;
   const forces = R.baseForces;
   ds.forEach(dn => kls.forEach(kl => {
-    const d = BS.M.SRUBY[dn].d, d0 = BS.M.d0Kotwy(d), ez = Math.max(50, Math.ceil(1.5 * d0 / 5) * 5);
-    const extList = fixed ? [2 * ez + 30, 2 * ez + 60, 2 * ez + 90, 2 * ez + 130] : [40, 60];
+    const d = BS.M.SRUBY[dn].d, d0 = BS.M.d0Kotwy(d), ez = Math.max(50, Math.ceil(1.5 * d0 / 5) * 5), cK = Math.ceil((10 * Math.SQRT2 + d + 5) / 5) * 5;
+    const extList = fixed ? [ez + Math.max(cK, ez) + 10, 2 * ez + 30, 2 * ez + 60, 2 * ez + 90, 2 * ez + 130] : [40, 60];
     extList.forEach(ext => {
       const lp = Math.ceil((h + 2 * ext) / 10) * 10;
-      [Math.max(30, Math.ceil(1.2 * d0 / 5) * 5 + 10), 60, 80].forEach(ey => {
-        const bp = Math.ceil((b + 2 * Math.max(ey - 10, 30)) / 10) * 10;
-        const w = Math.max(b + 2 * 20, bp - 2 * Math.max(ey, Math.ceil(1.2 * d0)));
+      // odległość osi otworu od krawędzi e_y ≥ 1,2·d0 (tabl. 3.3) – najpierw e_y, potem szerokość blachy; rozstaw w ≥ max(b + 40, 2,4·d0)
+      const eMinR = Math.ceil(1.2 * d0 / 5) * 5;
+      const ukList = fixed ? ['zew'] : (st.podstawa.kotwy.uklad === 'os' ? ['os'] : ['wew', 'os']);
+      [Math.max(eMinR, 40), Math.max(eMinR, 40) + 20, Math.max(eMinR, 40) + 40].forEach(ey => ukList.forEach(uk => {
+        const bp = Math.ceil((Math.max(b + 40, 2.4 * d0) + 2 * ey) / 10) * 10;
+        const w = bp - 2 * ey;
         for (const tp of tps) {
           const s2 = U.clone(st);
           Object.assign(s2.podstawa, { lp, bp, tp });
-          Object.assign(s2.podstawa.kotwy, { d: dn, kl, ez, w, uklad: fixed ? 'zew' : (s2.podstawa.kotwy.uklad === 'os' ? 'os' : 'wew') });
+          Object.assign(s2.podstawa.kotwy, { d: dn, kl, ez, w, uklad: uk, p: '' });
           let C; try { C = PB.components(s2, sec, R.base, ndp); } catch (e) { continue; }
-          if (C.err.length) continue;
+          if (C.err.length || C.geo.uE > 1 || C.geo.uP > 1 || C.geo.uK > 1) continue;   // tabl. 3.3 i odstęp od słupa
           // nośności bez spoin; spoiny dobierane osobno (wytężenie ∝ 1/a)
           let u = 0, uf = 0, uw = 0;
           for (const f of forces) { const r = PB.check(C, f, ndp, sec); u = Math.max(u, r.uN, r.uNt, r.uM, r.uV, r.uTV); uf = Math.max(uf, r.uWf); uw = Math.max(uw, r.uWw); if (u > lim) break; }
@@ -510,7 +519,7 @@ J.designBase = function (st, R, eta) {
             break;
           }
         }
-      });
+      }));
     });
   }));
   if (!best) return { err: 'Nie znaleziono podstawy spełniającej warunki w zakresie doboru (kotwy do M48, blacha do 80 mm) – rozważ żebra usztywniające lub podstawę z trawersami.' };

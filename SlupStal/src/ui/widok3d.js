@@ -435,8 +435,12 @@ W3.dxf = function (S, R) {
     Dw.line(PX(0), PY(-C0.lp / 2 - 30), PX(0), PY(C0.lp / 2 + 30), 'OSIE'); Dw.line(PX(-C0.bp / 2 - 30), PY(0), PX(C0.bp / 2 + 30), PY(0), 'OSIE');
     Dw.dimH(PX(-C0.bp / 2), PX(C0.bp / 2), PY(C0.lp / 2) + 8, f0(C0.bp, 0));
     Dw.dimV(PX(-C0.bp / 2) - 8, PY(-C0.lp / 2), PY(C0.lp / 2), f0(C0.lp, 0));
-    if (an.length > 1) Dw.dimH(PX(-C0.w / 2), PX(C0.w / 2), PY(-C0.lp / 2) - 8, f0(C0.w, 0));
-    if (C0.uk === 'zew') Dw.dimV(PX(C0.bp / 2) + 8, PY(-C0.zT), PY(C0.zT), f0(2 * C0.zT, 0));
+    // łańcuchy wymiarowe osi otworów: e_y | w | e_y oraz e_z | 2z_T (p) | e_z
+    const eY = (C0.bp - C0.w) / 2, zA = Math.max(...an.map(a => a[1])), eZ = C0.lp / 2 - zA;
+    if (an.length > 1) { Dw.dimH(PX(-C0.bp / 2), PX(-C0.w / 2), PY(-C0.lp / 2) - 8, f0(eY, 0)); Dw.dimH(PX(-C0.w / 2), PX(C0.w / 2), PY(-C0.lp / 2) - 8, f0(C0.w, 0)); Dw.dimH(PX(C0.w / 2), PX(C0.bp / 2), PY(-C0.lp / 2) - 8, f0(eY, 0)); }
+    Dw.dimV(PX(C0.bp / 2) + 8, PY(zA), PY(C0.lp / 2), f0(eZ, 0));
+    if (zA > 0) Dw.dimV(PX(C0.bp / 2) + 8, PY(-zA), PY(zA), f0(2 * zA, 0));
+    Dw.dimV(PX(C0.bp / 2) + 8, PY(-C0.lp / 2), PY(-zA), f0(eZ, 0));
     Dw.text(PX(0), PY(C0.lp / 2) + 18, 3, `BLACHA PODSTAWY ${f0(C0.tp, 0)}×${f0(C0.bp, 0)}×${f0(C0.lp, 0)} ${C0.gat} – rzut 1:${Kp}`, 'OPISY', 'c');
     Dw.text(PX(0), PY(-C0.lp / 2) - 18, 2.2, `${C0.nb} × ${S.podstawa.kotwy.d} kl. ${S.podstawa.kotwy.kl}, otwory %%c${f0(C0.d0, 0)}; spoiny: pasy a = ${f0(C0.af, 0)}, środnik a = ${f0(C0.aw, 0)}`, 'OPISY', 'c');
     Dw.text(PX(0), PY(-C0.lp / 2) - 23, 2.2, `podlewka ${f0(C0.tg, 0)} mm, beton fundamentu ${S.podstawa.beton}`, 'OPISY', 'c');

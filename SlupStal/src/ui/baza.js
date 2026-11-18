@@ -34,10 +34,10 @@ Q.svgOpen = (w, h, extra) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w
 Q.tx = (x, y, s, o) => { o = o || {}; return `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${o.fs || 11}" fill="${o.c || '#1b2230'}" text-anchor="${o.a || 'middle'}" ${o.w ? `font-weight="${o.w}"` : ''} ${o.rot ? `transform="rotate(${o.rot} ${(+x).toFixed(1)} ${(+y).toFixed(1)})"` : ''}>${s}</text>`; };
 Q.dimH = (x1, x2, y, label, o) => { o = o || {};
   return `<g stroke="#5d6778" stroke-width="0.8"><line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}"/><line x1="${x1}" y1="${y - 4}" x2="${x1}" y2="${y + 4}"/><line x1="${x2}" y1="${y - 4}" x2="${x2}" y2="${y + 4}"/>` +
-    `<line x1="${x1 - 3}" y1="${y + 3}" x2="${x1 + 3}" y2="${y - 3}"/><line x1="${x2 - 3}" y1="${y + 3}" x2="${x2 + 3}" y2="${y - 3}"/></g>` + Q.tx((x1 + x2) / 2, y + (o.below ? 13 : -4), label, { fs: o.fs || 10.5, c: '#3d4656' }); };
+    `<line x1="${x1 - 3}" y1="${y + 3}" x2="${x1 + 3}" y2="${y - 3}"/><line x1="${x2 - 3}" y1="${y + 3}" x2="${x2 + 3}" y2="${y - 3}"/></g>` + Q.tx((x1 + x2) / 2, y + (o.below ? 13 : -4), label, { fs: o.fs || 10.5, c: o.c || '#3d4656', w: o.w }); };
 Q.dimV = (x, y1, y2, label, o) => { o = o || {};
   return `<g stroke="#5d6778" stroke-width="0.8"><line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}"/><line x1="${x - 4}" y1="${y1}" x2="${x + 4}" y2="${y1}"/><line x1="${x - 4}" y1="${y2}" x2="${x + 4}" y2="${y2}"/>` +
-    `<line x1="${x - 3}" y1="${y1 + 3}" x2="${x + 3}" y2="${y1 - 3}"/><line x1="${x - 3}" y1="${y2 + 3}" x2="${x + 3}" y2="${y2 - 3}"/></g>` + Q.tx(x + (o.right ? 6 : -5), (y1 + y2) / 2, label, { fs: o.fs || 10.5, c: '#3d4656', a: o.right ? 'start' : 'middle', rot: o.right ? 0 : -90 }); };
+    `<line x1="${x - 3}" y1="${y1 + 3}" x2="${x + 3}" y2="${y1 - 3}"/><line x1="${x - 3}" y1="${y2 + 3}" x2="${x + 3}" y2="${y2 - 3}"/></g>` + Q.tx(x + (o.right ? 6 : -5), (y1 + y2) / 2, label, { fs: o.fs || 10.5, c: o.c || '#3d4656', w: o.w, a: o.right ? 'start' : 'middle', rot: o.right ? 0 : -90 }); };
 
 /* kolory rysunków w motywie ciemnym: stałe kolory #rrggbb → zmienne --sv-rrggbb (zdefiniowane w CSS) */
 const SVCOL = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;

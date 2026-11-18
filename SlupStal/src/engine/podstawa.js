@@ -23,6 +23,36 @@ PB.KOTWY_KL = {
   'S235': { fyb: 235, fub: 360, n: 'pręt gwintowany ze stali S235' }, 'S355': { fyb: 355, fub: 490, n: 'pręt gwintowany ze stali S355' }
 };
 
+/* rozmieszczenie otworów kotew: odległości osi od krawędzi blachy e_y, e_z i rozstawy p wg tabl. 3.3;
+   odstęp osi kotwy od słupa: podkładka (Ø ≈ 2d) poza spoiną (a√2) + luz montażowy 5 mm.
+   Współrzędne: y – wzdłuż b_p, z – wzdłuż l_p (od osi słupa). */
+PB.geometry = function (q) {
+  const { uk, nb, rows, w, zT, lp, bp, tp, d, d0, af, aw, sec } = q;
+  const A = uk === 'zew' || rows === 2 ? [[w / 2, zT], [-w / 2, zT], [w / 2, -zT], [-w / 2, -zT]] : [[w / 2, 0], [-w / 2, 0]];
+  void nb;
+  const eY = (bp - w) / 2, eZ = lp / 2 - (rows === 2 || uk === 'zew' ? zT : 0);
+  const pY = w, pZ = rows === 2 || uk === 'zew' ? 2 * zT : null;
+  const o = { anchors: A, eY, eZ, pY, pZ, d, d0, eMin: 1.2 * d0, p1Min: 2.2 * d0, p2Min: 2.4 * d0, eMaxCorr: 4 * tp + 40 };
+  o.eGov = Math.min(eY, eZ);
+  o.uE = o.eGov > 0 ? o.eMin / o.eGov : Infinity;
+  o.uP = Math.max(pY > 0 ? o.p2Min / pY : Infinity, pZ !== null ? (pZ > 0 ? o.p1Min / pZ : Infinity) : 0);
+  // odstęp od słupa – odległość osi kotwy od obrysu przekroju (wieloboki przekroju, oś z w środku ciężkości)
+  o.dw = 2 * d; o.weldLeg = Math.max(af || 0, aw || 0) * Math.SQRT2; o.cReq = o.weldLeg + o.dw / 2 + 5;
+  const rings = sec && sec.rings ? sec.rings.map(r => r.map(([y, z]) => [y, z - sec.zc])) : [];
+  const closed = sec && (sec.kind === 'RHS' || sec.kind === 'CHS');
+  const inPoly = (pt, ring) => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [yi, zi] = ring[i], [yj, zj] = ring[j]; if ((zi > pt[1]) !== (zj > pt[1]) && pt[0] < (yj - yi) * (pt[1] - zi) / (zj - zi) + yi) c = !c; } return c; };
+  const segD = (p, a, b) => { const vy = b[0] - a[0], vz = b[1] - a[1], L2 = vy * vy + vz * vz; const t = L2 > 0 ? U.clamp(((p[0] - a[0]) * vy + (p[1] - a[1]) * vz) / L2, 0, 1) : 0; return Math.hypot(p[0] - a[0] - t * vy, p[1] - a[1] - t * vz); };
+  let clr = Infinity, inside = false;
+  A.forEach(pt => {
+    const outer = closed ? [rings[0]] : rings;
+    if (outer.some(r => r && inPoly(pt, r))) inside = true;
+    rings.forEach(r => { for (let i = 0; i < r.length; i++) clr = Math.min(clr, segD(pt, r[i], r[(i + 1) % r.length])); });
+  });
+  o.clr = inside ? 0 : clr; o.inside = inside;
+  o.uK = inside ? Infinity : o.clr > 0 ? o.cReq / o.clr : Infinity;
+  return o;
+};
+
 /* geometria i nośności składników (niezależne od sił) */
 PB.components = function (st, sec, base, ndp) {
   const o = st.podstawa || {}, kt = o.kotwy || {};
@@ -84,16 +114,17 @@ PB.components = function (st, sec, base, ndp) {
   const FtRd = k2 * fub * As / g2;
   const uk = kt.uklad || (fixed ? 'zew' : 'wew');
   const nR = 2;                                                     // kotwy w rzędzie (szerokość b_p)
-  const w = U.num(kt.w, 0) || Math.max(0, Math.min(bp - 2 * 50, b + 2 * 60)), eY = (bp - w) / 2;
+  const eAuto = Math.max(50, Math.ceil(1.5 * M.d0Kotwy(d) / 5) * 5);          // odległość osi otworu od krawędzi (auto) ≥ 1,2·d0 z zapasem
+  const w = U.num(kt.w, 0) || Math.max(0, Math.min(bp - 2 * eAuto, b + 2 * 60)), eY = (bp - w) / 2;
   let nb, rows, zT = null, Tt = null;
   const d0 = M.d0Kotwy(d);
   const lb = M.kotwaLb(d, tp, tg);
   const af = U.num((o.spoiny || {}).pas, 8), aw = U.num((o.spoiny || {}).srodnik, 5);
   if (uk === 'zew') {
-    const ez = U.num(kt.ez, 0) || Math.max(1.5 * d0, 50);
+    const ez = U.num(kt.ez, 0) || eAuto;
     nb = 4; rows = 2;
     zT = lp / 2 - ez;                                               // od osi słupa
-    if (zT <= h / 2 + 0.8 * af * Math.SQRT2 + 1.2 * d0 / 2) err.push(`Podstawa: kotwy zbyt blisko pasa słupa (z_T = ${U.fmt(zT, 0)} mm) – zwiększ l_p lub zmniejsz e_z.`);
+    if (zT <= h / 2) err.push(`Podstawa: oś kotew w obrysie słupa (z_T = ${U.fmt(zT, 0)} mm ≤ h/2 = ${U.fmt(h / 2, 0)} mm) – zwiększ l_p lub zmniejsz e_z.`);
     const x = zT - h / 2;                                           // od lica pasa do osi kotwy
     const mx = Math.max(1, x - 0.8 * af * Math.SQRT2), ex = ez;
     const e = eY;
@@ -111,8 +142,8 @@ PB.components = function (st, sec, base, ndp) {
     Tt = { mx, ex, e, w, lcp, lnc, leff1, leff2, Mpl1, Mpl2, n, sumFt, LbStar, Lb: lb, prying, FT1, FT2, FT3, FT12, FTpl, mode, x };
   } else {
     // kotwy wewnątrz obrysu (między pasami, przy środniku) lub w osi – podstawa przegubowa
-    nb = U.num(kt.n, 4) === 2 ? 2 : 4; rows = nb === 2 ? 1 : 2;
-    const p = U.num(kt.p, 0) || Math.max(0, h - 2 * tf - 2 * 50);
+    nb = uk === 'os' || U.num(kt.n, 4) === 2 ? 2 : 4; rows = nb === 2 ? 1 : 2;
+    const p = U.num(kt.p, 0) || Math.max(0, h - 2 * tf - 2 * Math.max(50, d + U.num((o.spoiny || {}).pas, 8) * Math.SQRT2 + 10));
     zT = rows === 1 ? 0 : p / 2;
     // rozciąganie (wyrywanie, N rozciągające): blacha między pasami – króciec z m od środnika (6.2.6.11, jak blacha czołowa – rząd wewnętrzny)
     const m = Math.max(1, (w / 2) - tw / 2 - 0.8 * aw * Math.SQRT2);
@@ -122,6 +153,9 @@ PB.components = function (st, sec, base, ndp) {
     const FT12 = 2 * Mpl1 / m, FT3 = 2 * FtRd;
     Tt = { m, e, w, leff1, Mpl1, FT12, FT3, FTpl: Math.min(FT12, FT3), mode: FT12 < FT3 ? 'blacha (postać 1-2)' : 'kotwy (postać 3)', p, prying: false, Lb: lb, inner: true };
   }
+  // --- rozmieszczenie otworów (PN-EN 1993-1-8, tabl. 3.3) i odstęp kotew od słupa (montaż podkładki i nakrętki)
+  const geo = PB.geometry({ uk, nb, rows, w, zT, lp, bp, tp, d, d0, af, aw, sec });
+  if (geo.inside) err.push('Podstawa: kotwa w obrysie słupa (przekrój zamknięty lub kotwa w ściance) – zmień układ lub rozstaw kotew.');
   // ścinanie kotwy (6.2.2(7)): F_2,vb,Rd = α_bc·f_ub·A_s/γM2, α_bc = 0,44 − 0,0003·f_yb; docisk blachy F_1,vb,Rd (tabl. 3.4)
   const abc = 0.44 - 0.0003 * U.clamp(fyb, 235, 640);
   const F2vb = abc * fub * As / g2;
@@ -146,7 +180,7 @@ PB.components = function (st, sec, base, ndp) {
     const kT = 1 / (1 / k15 + 1 / k16), kC = k13;
     stiff = { Ec, k13, k15, k16, kT, kC, z: zT + zC };
   }
-  return { err, warn, fixed, kind, lp, bp, tp, gat, fyP, fuP, fck, fcd, a1, b1, kj, kjMan, betaJ, fjd, tg, c, cz, cy, extZ, extY, Tf, Tw, Aeff, NjRd, FcplRd, FcfcRd, FC, zC, zT, d, As, fub, fyb, kl, FtRd, k2, uk, nb, rows, w, eY, d0, Tt, abc, F2vb, F1vb, Fvb, kotwyScin, af, aw, fvwd, bw, lwf, lww, h, b, tf, tw, stiff, kt, lb };
+  return { err, warn, fixed, kind, lp, bp, tp, gat, fyP, fuP, fck, fcd, a1, b1, kj, kjMan, betaJ, fjd, tg, c, cz, cy, extZ, extY, Tf, Tw, Aeff, NjRd, FcplRd, FcfcRd, FC, zC, zT, d, As, fub, fyb, kl, FtRd, k2, uk, nb, rows, w, eY, d0, Tt, abc, F2vb, F1vb, Fvb, kotwyScin, af, aw, fvwd, bw, lwf, lww, h, b, tf, tw, stiff, kt, lb, geo, eAuto };
 };
 
 /* M_j,Rd wg tabl. 6.7 (N > 0 – rozciąganie; M ≥ 0) – symetryczna podstawa */

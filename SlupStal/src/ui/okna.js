@@ -219,9 +219,14 @@ const BZ_KEYS = {
   tstub: ['podstawa.beton', 'podstawa.podlewka', 'podstawa.kjRecz']
 };
 const BZ_N = { plate: 'Blacha podstawy…', anch: 'Kotwy…', weld: 'Spoiny słupa z blachą…', conc: 'Fundament i beton…', grout: 'Podlewka…', tstub: 'Strefy docisku…' };
-function inlineEdit(x, y, key, label, after) {
+const DERIV = {
+  'podstawa.kotwy.eY': (n, st) => ['podstawa.kotwy.w', U.num(st.podstawa.bp) - 2 * n],
+  'podstawa.kotwy.eZw': (n, st) => ['podstawa.kotwy.p', U.num(st.podstawa.lp) - 2 * n],
+  'podstawa.kotwy.zT2': (n, st) => ['podstawa.kotwy.ez', (U.num(st.podstawa.lp) - n) / 2]
+};
+function inlineEdit(x, y, key, label, after, bv) {
   const old = $('.inled'); if (old) old.remove();
-  const v = Q.getP(S(), key);
+  const v = bv !== undefined && bv !== null && bv !== '' ? Math.round(+bv * 10) / 10 : Q.getP(S(), key);
   const d = document.createElement('div'); d.className = 'inled';
   d.innerHTML = `<label>${sym(label)}</label><input class="txt" value="${esc(showNum(v))}" autocomplete="off"><span class="u">mm</span><small>Enter – zastosuj, Esc – anuluj</small>`;
   document.body.appendChild(d);
@@ -235,7 +240,10 @@ function inlineEdit(x, y, key, label, after) {
     const n = parseNum(inp.value);
     if (n === null || !(n > 0)) { inp.classList.add('bad'); return; }
     close();
-    if (n !== U.num(v)) { Q.setP(S(), key, n); A.changed(true); if (after) after(); }
+    if (n === U.num(v)) return;
+    if (DERIV[key]) { const [k2, v2] = DERIV[key](n, S()); if (!(v2 > 0)) { Q.toast('Wartość poza zakresem – wymiar wynikowy byłby ≤ 0.'); return; } Q.setP(S(), k2, Math.round(v2 * 10) / 10); }
+    else Q.setP(S(), key, n);
+    A.changed(true); if (after) after();
   };
   const outside = (e) => { if (!d.contains(e.target)) apply(); };
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); apply(); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } });
@@ -250,7 +258,7 @@ A.bindBaseFig = function (root, inPopup) {
     if (els.length) { Q.hlg(els); try { els[0].focus({ preventScroll: true }); } catch (e) { /* */ } }
   };
   $$('.bz', svg).forEach(g => g.addEventListener('click', ev => { ev.stopPropagation(); focus(g.dataset.bz); }));
-  $$('.bzd', svg).forEach(rc => rc.addEventListener('click', ev => { ev.stopPropagation(); const t = rc.querySelector('title'); inlineEdit(ev.clientX, ev.clientY, rc.dataset.bk, t ? t.textContent.replace(/ – kliknij.*$/, '') : rc.dataset.bk); }));
+  $$('.bzd', svg).forEach(rc => rc.addEventListener('click', ev => { ev.stopPropagation(); const t = rc.querySelector('title'); inlineEdit(ev.clientX, ev.clientY, rc.dataset.bk, t ? t.textContent.replace(/ – kliknij.*$/, '') : rc.dataset.bk, null, rc.dataset.bv); }));
   svg.addEventListener('contextmenu', ev => {
     ev.preventDefault();
     const g = ev.target.closest && ev.target.closest('.bz');
@@ -279,6 +287,7 @@ A.basePopup = function (focusZ) {
     { k: 'podstawa.kotwy.w', t: 'num', l: 'Rozstaw kotew w rzędzie w', u: 'mm', list: [120, 150, 180, 200, 220, 250, 280, 300, 350], min: 40 },
     { k: 'podstawa.kotwy.p', t: 'num', l: 'Rozstaw rzędów p (między pasami)', u: 'mm', list: ['', 100, 150, 200, 250, 300], opt: true, ph: 'auto', min: 0, show: s => s.podstawa.kotwy.uklad === 'wew' },
     { k: 'podstawa.scinanieKotwy', t: 'chk', l: 'Kotwy przenoszą ścinanie (podkładki przyspawane)' },
+    { t: 'hint', h: () => { const r = R(), g = r && r.pb && r.pb.C && r.pb.C.geo; if (!g) return ''; const c = (v, mn) => `<b style="color:var(--${v + 1e-6 < mn ? 'fail' : 'ok'})">${fmt(v, 0)}</b>`; return `Otwory d₀ = ${fmt(g.d0, 0)} mm (tabl. 3.3): e<sub>y</sub> = ${c(g.eY, g.eMin)}, e<sub>z</sub> = ${c(g.eZ, g.eMin)} ≥ 1,2d₀ = ${fmt(g.eMin, 0)} mm; p₂ = ${c(g.pY, g.p2Min)} ≥ 2,4d₀ = ${fmt(g.p2Min, 0)} mm${g.pZ !== null ? `; p₁ = ${c(g.pZ, g.p1Min)} ≥ 2,2d₀ = ${fmt(g.p1Min, 0)} mm` : ''}; odstęp osi kotwy od słupa ${g.inside ? '<b style="color:var(--fail)">kotwa w obrysie słupa</b>' : c(g.clr, g.cReq)} ≥ ${fmt(g.cReq, 0)} mm (podkładka Ø ≈ 2d, spoina a√2, luz 5 mm). Wymiary e i p można zmieniać na rysunku.`; } },
     { t: 'sub', l: 'Fundament i spoiny' },
     { k: 'podstawa.beton', t: 'sel', l: 'Beton fundamentu', o: () => Object.keys(M.BETON).map(k => [k, k]) },
     { k: 'podstawa.podlewka', t: 'num', l: 'Podlewka t_{g}', u: 'mm', list: [20, 30, 40, 50], min: 0 },

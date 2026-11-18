@@ -402,11 +402,11 @@ D.basePlate = function (C0, sec, o) {
   const W = o.W || 620, Hh = o.H || 360;
   const { lp, bp, tp } = C0;
   // rzut: z pionowo (l_p), y poziomo (b_p)
-  const scP = Math.min((W * 0.5 - 110) / bp, (Hh - 96) / lp);
-  const cxP = 60 + bp * scP / 2, cyP = Hh / 2 + 2;
+  const scP = Math.min((W * 0.5 - 110) / bp, (Hh - 128) / lp);
+  const cxP = 60 + bp * scP / 2, cyP = Hh / 2 - 8;
   const X = (y) => cxP + y * scP, Y = (z) => cyP - z * scP;
   let s = svgOpen(W, Hh, 'class="basesvg" style="max-width:100%;height:auto"');
-  const ed = (k, x, y, w, h, t) => `<rect class="bzd" data-bk="${k}" x="${x}" y="${y}" width="${Math.max(12, w)}" height="${Math.max(12, h)}" fill="transparent" style="cursor:text"><title>${t} – kliknij, aby zmienić na rysunku</title></rect>`;
+  const ed = (k, x, y, w, h, t, bv) => `<rect class="bzd" data-bk="${k}"${bv !== undefined ? ` data-bv="${bv}"` : ''} x="${x}" y="${y}" width="${Math.max(12, w)}" height="${Math.max(12, h)}" fill="transparent" style="cursor:text"><title>${t} – kliknij, aby zmienić na rysunku</title></rect>`;
   const gz = (z, t, inner) => `<g class="bz" data-bz="${z}" style="cursor:pointer"><title>${t}</title>${inner}</g>`;
   s += tx(8, 16, 'Podstawa słupa – rzut', { fs: 11.5, w: 650, a: 'start' });
   s += gz('plate', 'Blacha podstawy – kliknij: wymiary, grubość, stal', `<rect x="${X(-bp / 2)}" y="${Y(lp / 2)}" width="${bp * scP}" height="${lp * scP}" fill="#e3e8f0" stroke="${C.ink}" stroke-width="1.2"/>`);
@@ -432,9 +432,24 @@ D.basePlate = function (C0, sec, o) {
   s += Q.dimH(X(-bp / 2), X(bp / 2), Y(lp / 2) - 12, `b<tspan baseline-shift="sub" font-size="75%">p</tspan> = ${fmt(bp, 0)}`);
   s += Q.dimV(X(-bp / 2) - 14, Y(-lp / 2), Y(lp / 2), `l<tspan baseline-shift="sub" font-size="75%">p</tspan> = ${fmt(lp, 0)}`);
   s += ed('podstawa.bp', X(-bp / 2), Y(lp / 2) - 26, bp * scP, 18, 'Szerokość blachy b_p') + ed('podstawa.lp', X(-bp / 2) - 32, Y(lp / 2), 22, lp * scP, 'Długość blachy l_p');
-  if (anchors.length) { const yA = Math.max(...anchors.map(a => a[0])), yB = Math.min(...anchors.map(a => a[0])); s += Q.dimH(X(yB), X(yA), Y(-lp / 2) + 14, `w = ${fmt(C0.w, 0)}`, { below: true }) + ed('podstawa.kotwy.w', X(yB), Y(-lp / 2) + 8, X(yA) - X(yB), 22, 'Rozstaw kotew w rzędzie w'); }
-  if (C0.uk === 'zew') s += Q.dimV(X(bp / 2) + 14, Y(C0.zT), Y(-C0.zT), `2z<tspan baseline-shift="sub" font-size="75%">T</tspan> = ${fmt(2 * C0.zT, 0)}`, { right: true }) + ed('podstawa.kotwy.ez', X(bp / 2) + 6, Y(C0.zT), 26, 2 * C0.zT * scP, 'Odległość rzędu kotew od krawędzi blachy e_z (2z_T = l_p − 2e_z)');
-  s += tx(X(bp / 2) + 6, Y(lp / 2) + 4, `${C0.nb} × ${o.dName || ''} kl. ${o.kl || ''}`, { fs: 9.5, c: C.red, a: 'start' });
+  // łańcuchy wymiarowe osi otworów: e_y | w | e_y (wzdłuż b_p) oraz e_z | p | e_z (wzdłuż l_p); czerwone – poniżej minimum tabl. 3.3
+  const G = C0.geo || {}, sub = (a, b2) => `${a}<tspan baseline-shift="sub" font-size="75%">${b2}</tspan>`;
+  const bad = (v, mn) => (v < mn - 1e-6 ? { c: C.red, w: 700 } : {});
+  if (anchors.length) {
+    const yA = Math.max(...anchors.map(a => a[0])), yB = Math.min(...anchors.map(a => a[0])), yD = Y(-lp / 2) + 14;
+    const eY = (bp - C0.w) / 2, eOk = bad(eY, G.eMin || 0), pOk = bad(C0.w, G.p2Min || 0);
+    s += Q.dimH(X(-bp / 2), X(yB), yD, `${fmt(eY, 0)}`, Object.assign({ below: true, fs: 9.5 }, eOk)) + Q.dimH(X(yB), X(yA), yD, `w = ${fmt(C0.w, 0)}`, Object.assign({ below: true }, pOk)) + Q.dimH(X(yA), X(bp / 2), yD, `${fmt(eY, 0)}`, Object.assign({ below: true, fs: 9.5 }, eOk));
+    s += ed('podstawa.kotwy.eY', X(-bp / 2), yD - 6, X(yB) - X(-bp / 2), 22, 'Odległość osi otworu od krawędzi blachy e_y', eY) + ed('podstawa.kotwy.w', X(yB), yD - 6, X(yA) - X(yB), 22, 'Rozstaw kotew w rzędzie w (p₂)') + ed('podstawa.kotwy.eY', X(yA), yD - 6, X(bp / 2) - X(yA), 22, 'Odległość osi otworu od krawędzi blachy e_y', eY);
+    const zAx = Math.max(...anchors.map(a => a[1])), xD = X(bp / 2) + 14, eZ = lp / 2 - zAx, ezOk = bad(eZ, G.eMin || 0);
+    const kEz = C0.uk === 'zew' ? 'podstawa.kotwy.ez' : zAx > 0 ? 'podstawa.kotwy.eZw' : null;
+    s += Q.dimV(xD, Y(lp / 2), Y(zAx), `${fmt(eZ, 0)}`, Object.assign({ right: true, fs: 9.5 }, ezOk));
+    if (zAx > 0) s += Q.dimV(xD, Y(zAx), Y(-zAx), C0.uk === 'zew' ? `${sub('2z', 'T')} = ${fmt(2 * zAx, 0)}` : `p = ${fmt(2 * zAx, 0)}`, Object.assign({ right: true }, bad(2 * zAx, G.p1Min || 0)));
+    s += Q.dimV(xD, Y(-zAx), Y(-lp / 2), `${fmt(eZ, 0)}`, Object.assign({ right: true, fs: 9.5 }, ezOk));
+    if (kEz) s += ed(kEz, xD - 6, Y(lp / 2), 34, Y(zAx) - Y(lp / 2), 'Odległość osi otworu od krawędzi blachy e_z', eZ) + ed(kEz, xD - 6, Y(-zAx), 34, Y(-lp / 2) - Y(-zAx), 'Odległość osi otworu od krawędzi blachy e_z', eZ);
+    if (zAx > 0) s += ed(C0.uk === 'zew' ? 'podstawa.kotwy.zT2' : 'podstawa.kotwy.p', xD - 6, Y(zAx), 60, Y(-zAx) - Y(zAx), C0.uk === 'zew' ? 'Rozstaw rzędów kotew 2z_T (p₁)' : 'Rozstaw rzędów kotew p (p₁)', 2 * zAx);
+    if (G.eMin) s += tx(X(-bp / 2) - 30, Y(-lp / 2) + 44, `min. (tabl. 3.3): e ≥ 1,2d₀ = ${fmt(G.eMin, 0)}; p₁ ≥ 2,2d₀ = ${fmt(G.p1Min, 0)}; p₂ ≥ 2,4d₀ = ${fmt(G.p2Min, 0)} mm (d₀ = ${fmt(G.d0, 0)})`, { fs: 8.5, a: 'start', c: (G.uE > 1 || G.uP > 1) ? C.red : C.mut });
+  }
+  s += tx(X(bp / 2) + 6, Y(lp / 2) - 26, `${C0.nb} × ${o.dName || ''} kl. ${o.kl || ''}`, { fs: 9.5, c: C.red, a: 'start' });
   // widok z boku
   const x0 = W * 0.56, wv = W - x0 - 80, scV = Math.min(wv / lp, 1.2 * scP);
   const cxV = x0 + wv / 2, yP = Hh * 0.52;

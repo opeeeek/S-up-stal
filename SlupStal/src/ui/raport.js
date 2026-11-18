@@ -383,6 +383,26 @@ RP.tokBase = function (c, R, S) {
       if (c.id === 'PBWf') { h += eq('F_f', '|M_{y,Ed}|/(h − t_f) + |N_{Ed}|·A_f/A', '', kN(r.wf.Ff1), 'kN', 'metoda uproszczona') + eq('f_w', '√[(F_f/(a_f·l_{wf}))² + (V_y/(2a_f·l_{wf}))²]', `a_f = ${fm(C.af, 0)} mm, l<sub>wf</sub> = ${fm(C.lwf, 0)} mm`, fm(r.wf.fw, 1), 'MPa', '4.5.3.3'); h += verd(fm(r.wf.fw, 1), fm(C.fvwd, 1), c.util, 'MPa'); }
       else { h += eq('f_w', 'V_{z,Ed}/(a_w·l_{ww})', `${kN(fo.Vz)}·10³/(${fm(C.aw, 0)}·${fm(C.lww, 0)})`, fm(r.wf.fvz, 1), 'MPa'); h += verd(fm(r.wf.fvz, 1), fm(C.fvwd, 1), c.util, 'MPa'); }
       break;
+    case 'PBe': case 'PBp': case 'PBk': {
+      const g = C.geo;
+      h += line(`Kotwy ${C.nb} × ${esc((C.kt && C.kt.d) || '')}, otwory w blasze d<sub>0</sub> = ${fm(g.d0, 0)} mm (otwory powiększone pod kotwy); układ: ${C.uk === 'zew' ? '2 rzędy poza pasami' : C.nb === 2 ? '2 kotwy w osi' : '4 kotwy między pasami'}; blacha ${fm(C.lp, 0)} × ${fm(C.bp, 0)} mm`, 'PN-EN 1993-1-8, tabl. 3.3');
+      if (c.id === 'PBe') {
+        h += eq('e_y', '(b_p − w)/2', `(${fm(C.bp, 0)} − ${fm(g.pY, 0)})/2`, fm(g.eY, 1), 'mm') + eq('e_z', C.uk === 'zew' ? 'l_p/2 − z_T' : g.pZ !== null ? '(l_p − p)/2' : 'l_p/2', C.uk === 'zew' ? `${fm(C.lp, 0)}/2 − ${fm(g.pZ / 2, 1)}` : g.pZ !== null ? `(${fm(C.lp, 0)} − ${fm(g.pZ, 0)})/2` : '', fm(g.eZ, 1), 'mm');
+        h += eq('e_{min}', '1,2·d_0', `1,2·${fm(g.d0, 0)}`, fm(g.eMin, 1), 'mm', 'tabl. 3.3');
+        h += verd(fm(g.eMin, 1), fm(g.eGov, 1), c.util, 'mm');
+        h += line(`Uwaga: dla elementów narażonych na korozję zaleca się e ≤ 4t + 40 mm = ${fm(g.eMaxCorr, 0)} mm (tabl. 3.3, wartość maksymalna).`);
+      } else if (c.id === 'PBp') {
+        h += eq('p_2', 'w (rozstaw kotew w rzędzie, kierunek y)', '', fm(g.pY, 1), 'mm') + eq('p_{2,min}', '2,4·d_0', `2,4·${fm(g.d0, 0)}`, fm(g.p2Min, 1), 'mm', 'tabl. 3.3');
+        if (g.pZ !== null) h += eq('p_1', C.uk === 'zew' ? '2z_T (rozstaw rzędów, kierunek z)' : 'p (rozstaw rzędów, kierunek z)', '', fm(g.pZ, 1), 'mm') + eq('p_{1,min}', '2,2·d_0', `2,2·${fm(g.d0, 0)}`, fm(g.p1Min, 1), 'mm', 'tabl. 3.3');
+        h += eq('η', g.pZ !== null ? 'max(p_{2,min}/p_2; p_{1,min}/p_1)' : 'p_{2,min}/p_2', '', fm(c.util, 3), '≤ 1', '', c.util <= 1 ? ['ok', '✔'] : ['fail', '✖']);
+      } else {
+        h += line('Wymaganie konstrukcyjno-montażowe: podkładka i nakrętka kotwy nie mogą nachodzić na spoinę słupa z blachą; potrzebny luz na klucz.');
+        h += eq('c_{req}', 'a√2 + d_w/2 + 5', `${fm(g.weldLeg, 1)} + ${fm(g.dw, 0)}/2 + 5`, fm(g.cReq, 1), 'mm', 'd_w ≈ 2d – podkładka');
+        h += line(g.inside ? '<span class="fail">Oś kotwy w obrysie przekroju słupa – układ niewykonalny.</span>' : `Najmniejsza odległość osi kotwy od obrysu słupa (lico pasa / środnika / ścianki): <b>${fm(g.clr, 1)} mm</b>`);
+        h += verd(fm(g.cReq, 1), g.inside ? '0' : fm(g.clr, 1), c.util, 'mm');
+      }
+      break;
+    }
     case 'PBS': {
       const s1 = d, st = C.stiff;
       h += line(`k<sub>13</sub> (beton) = E<sub>c</sub>√(b<sub>eff</sub>l<sub>eff</sub>)/(1,275E) = ${fm(st.k13, 2)} mm; k<sub>15</sub> (blacha) = ${fm(st.k15, 3)} mm; k<sub>16</sub> (kotwy) = ${fm(st.k16, 3)} mm`, 'tabl. 6.11');

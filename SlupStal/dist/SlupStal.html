@@ -3719,6 +3719,36 @@ PB.KOTWY_KL = {
   'S235': { fyb: 235, fub: 360, n: 'pręt gwintowany ze stali S235' }, 'S355': { fyb: 355, fub: 490, n: 'pręt gwintowany ze stali S355' }
 };
 
+/* rozmieszczenie otworów kotew: odległości osi od krawędzi blachy e_y, e_z i rozstawy p wg tabl. 3.3;
+   odstęp osi kotwy od słupa: podkładka (Ø ≈ 2d) poza spoiną (a√2) + luz montażowy 5 mm.
+   Współrzędne: y – wzdłuż b_p, z – wzdłuż l_p (od osi słupa). */
+PB.geometry = function (q) {
+  const { uk, nb, rows, w, zT, lp, bp, tp, d, d0, af, aw, sec } = q;
+  const A = uk === 'zew' || rows === 2 ? [[w / 2, zT], [-w / 2, zT], [w / 2, -zT], [-w / 2, -zT]] : [[w / 2, 0], [-w / 2, 0]];
+  void nb;
+  const eY = (bp - w) / 2, eZ = lp / 2 - (rows === 2 || uk === 'zew' ? zT : 0);
+  const pY = w, pZ = rows === 2 || uk === 'zew' ? 2 * zT : null;
+  const o = { anchors: A, eY, eZ, pY, pZ, d, d0, eMin: 1.2 * d0, p1Min: 2.2 * d0, p2Min: 2.4 * d0, eMaxCorr: 4 * tp + 40 };
+  o.eGov = Math.min(eY, eZ);
+  o.uE = o.eGov > 0 ? o.eMin / o.eGov : Infinity;
+  o.uP = Math.max(pY > 0 ? o.p2Min / pY : Infinity, pZ !== null ? (pZ > 0 ? o.p1Min / pZ : Infinity) : 0);
+  // odstęp od słupa – odległość osi kotwy od obrysu przekroju (wieloboki przekroju, oś z w środku ciężkości)
+  o.dw = 2 * d; o.weldLeg = Math.max(af || 0, aw || 0) * Math.SQRT2; o.cReq = o.weldLeg + o.dw / 2 + 5;
+  const rings = sec && sec.rings ? sec.rings.map(r => r.map(([y, z]) => [y, z - sec.zc])) : [];
+  const closed = sec && (sec.kind === 'RHS' || sec.kind === 'CHS');
+  const inPoly = (pt, ring) => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [yi, zi] = ring[i], [yj, zj] = ring[j]; if ((zi > pt[1]) !== (zj > pt[1]) && pt[0] < (yj - yi) * (pt[1] - zi) / (zj - zi) + yi) c = !c; } return c; };
+  const segD = (p, a, b) => { const vy = b[0] - a[0], vz = b[1] - a[1], L2 = vy * vy + vz * vz; const t = L2 > 0 ? U.clamp(((p[0] - a[0]) * vy + (p[1] - a[1]) * vz) / L2, 0, 1) : 0; return Math.hypot(p[0] - a[0] - t * vy, p[1] - a[1] - t * vz); };
+  let clr = Infinity, inside = false;
+  A.forEach(pt => {
+    const outer = closed ? [rings[0]] : rings;
+    if (outer.some(r => r && inPoly(pt, r))) inside = true;
+    rings.forEach(r => { for (let i = 0; i < r.length; i++) clr = Math.min(clr, segD(pt, r[i], r[(i + 1) % r.length])); });
+  });
+  o.clr = inside ? 0 : clr; o.inside = inside;
+  o.uK = inside ? Infinity : o.clr > 0 ? o.cReq / o.clr : Infinity;
+  return o;
+};
+
 /* geometria i nośności składników (niezależne od sił) */
 PB.components = function (st, sec, base, ndp) {
   const o = st.podstawa || {}, kt = o.kotwy || {};
@@ -3780,16 +3810,17 @@ PB.components = function (st, sec, base, ndp) {
   const FtRd = k2 * fub * As / g2;
   const uk = kt.uklad || (fixed ? 'zew' : 'wew');
   const nR = 2;                                                     // kotwy w rzędzie (szerokość b_p)
-  const w = U.num(kt.w, 0) || Math.max(0, Math.min(bp - 2 * 50, b + 2 * 60)), eY = (bp - w) / 2;
+  const eAuto = Math.max(50, Math.ceil(1.5 * M.d0Kotwy(d) / 5) * 5);          // odległość osi otworu od krawędzi (auto) ≥ 1,2·d0 z zapasem
+  const w = U.num(kt.w, 0) || Math.max(0, Math.min(bp - 2 * eAuto, b + 2 * 60)), eY = (bp - w) / 2;
   let nb, rows, zT = null, Tt = null;
   const d0 = M.d0Kotwy(d);
   const lb = M.kotwaLb(d, tp, tg);
   const af = U.num((o.spoiny || {}).pas, 8), aw = U.num((o.spoiny || {}).srodnik, 5);
   if (uk === 'zew') {
-    const ez = U.num(kt.ez, 0) || Math.max(1.5 * d0, 50);
+    const ez = U.num(kt.ez, 0) || eAuto;
     nb = 4; rows = 2;
     zT = lp / 2 - ez;                                               // od osi słupa
-    if (zT <= h / 2 + 0.8 * af * Math.SQRT2 + 1.2 * d0 / 2) err.push(`Podstawa: kotwy zbyt blisko pasa słupa (z_T = ${U.fmt(zT, 0)} mm) – zwiększ l_p lub zmniejsz e_z.`);
+    if (zT <= h / 2) err.push(`Podstawa: oś kotew w obrysie słupa (z_T = ${U.fmt(zT, 0)} mm ≤ h/2 = ${U.fmt(h / 2, 0)} mm) – zwiększ l_p lub zmniejsz e_z.`);
     const x = zT - h / 2;                                           // od lica pasa do osi kotwy
     const mx = Math.max(1, x - 0.8 * af * Math.SQRT2), ex = ez;
     const e = eY;
@@ -3807,8 +3838,8 @@ PB.components = function (st, sec, base, ndp) {
     Tt = { mx, ex, e, w, lcp, lnc, leff1, leff2, Mpl1, Mpl2, n, sumFt, LbStar, Lb: lb, prying, FT1, FT2, FT3, FT12, FTpl, mode, x };
   } else {
     // kotwy wewnątrz obrysu (między pasami, przy środniku) lub w osi – podstawa przegubowa
-    nb = U.num(kt.n, 4) === 2 ? 2 : 4; rows = nb === 2 ? 1 : 2;
-    const p = U.num(kt.p, 0) || Math.max(0, h - 2 * tf - 2 * 50);
+    nb = uk === 'os' || U.num(kt.n, 4) === 2 ? 2 : 4; rows = nb === 2 ? 1 : 2;
+    const p = U.num(kt.p, 0) || Math.max(0, h - 2 * tf - 2 * Math.max(50, d + U.num((o.spoiny || {}).pas, 8) * Math.SQRT2 + 10));
     zT = rows === 1 ? 0 : p / 2;
     // rozciąganie (wyrywanie, N rozciągające): blacha między pasami – króciec z m od środnika (6.2.6.11, jak blacha czołowa – rząd wewnętrzny)
     const m = Math.max(1, (w / 2) - tw / 2 - 0.8 * aw * Math.SQRT2);
@@ -3818,6 +3849,9 @@ PB.components = function (st, sec, base, ndp) {
     const FT12 = 2 * Mpl1 / m, FT3 = 2 * FtRd;
     Tt = { m, e, w, leff1, Mpl1, FT12, FT3, FTpl: Math.min(FT12, FT3), mode: FT12 < FT3 ? 'blacha (postać 1-2)' : 'kotwy (postać 3)', p, prying: false, Lb: lb, inner: true };
   }
+  // --- rozmieszczenie otworów (PN-EN 1993-1-8, tabl. 3.3) i odstęp kotew od słupa (montaż podkładki i nakrętki)
+  const geo = PB.geometry({ uk, nb, rows, w, zT, lp, bp, tp, d, d0, af, aw, sec });
+  if (geo.inside) err.push('Podstawa: kotwa w obrysie słupa (przekrój zamknięty lub kotwa w ściance) – zmień układ lub rozstaw kotew.');
   // ścinanie kotwy (6.2.2(7)): F_2,vb,Rd = α_bc·f_ub·A_s/γM2, α_bc = 0,44 − 0,0003·f_yb; docisk blachy F_1,vb,Rd (tabl. 3.4)
   const abc = 0.44 - 0.0003 * U.clamp(fyb, 235, 640);
   const F2vb = abc * fub * As / g2;
@@ -3842,7 +3876,7 @@ PB.components = function (st, sec, base, ndp) {
     const kT = 1 / (1 / k15 + 1 / k16), kC = k13;
     stiff = { Ec, k13, k15, k16, kT, kC, z: zT + zC };
   }
-  return { err, warn, fixed, kind, lp, bp, tp, gat, fyP, fuP, fck, fcd, a1, b1, kj, kjMan, betaJ, fjd, tg, c, cz, cy, extZ, extY, Tf, Tw, Aeff, NjRd, FcplRd, FcfcRd, FC, zC, zT, d, As, fub, fyb, kl, FtRd, k2, uk, nb, rows, w, eY, d0, Tt, abc, F2vb, F1vb, Fvb, kotwyScin, af, aw, fvwd, bw, lwf, lww, h, b, tf, tw, stiff, kt, lb };
+  return { err, warn, fixed, kind, lp, bp, tp, gat, fyP, fuP, fck, fcd, a1, b1, kj, kjMan, betaJ, fjd, tg, c, cz, cy, extZ, extY, Tf, Tw, Aeff, NjRd, FcplRd, FcfcRd, FC, zC, zT, d, As, fub, fyb, kl, FtRd, k2, uk, nb, rows, w, eY, d0, Tt, abc, F2vb, F1vb, Fvb, kotwyScin, af, aw, fvwd, bw, lwf, lww, h, b, tf, tw, stiff, kt, lb, geo, eAuto };
 };
 
 /* M_j,Rd wg tabl. 6.7 (N > 0 – rozciąganie; M ≥ 0) – symetryczna podstawa */
@@ -4493,6 +4527,12 @@ J.run = function (st0, opt) {
     if (C) {
       C.warn.forEach(wrn);
       out.pb = { C, worst: {} };
+      if (C.geo) {
+        const GB0 = 'Podstawa słupa (PN-EN 1993-1-8)', g = C.geo;
+        out.checks.push(BS.check({ id: 'PBe', grp: GB0, n: `Odległości osi otworów od krawędzi blachy: e_y = ${U.fmt(g.eY, 0)} mm, e_z = ${U.fmt(g.eZ, 0)} mm ≥ 1,2·d₀`, ref: 'PN-EN 1993-1-8, tabl. 3.3', Ed: g.eMin, Rd: g.eGov, unit: 'mm', util: g.uE, d: { C } }));
+        out.checks.push(BS.check({ id: 'PBp', grp: GB0, n: `Rozstaw otworów kotew: p₂ = ${U.fmt(g.pY, 0)} mm ≥ 2,4·d₀${g.pZ !== null ? `, p₁ = ${U.fmt(g.pZ, 0)} mm ≥ 2,2·d₀` : ''}`, ref: 'PN-EN 1993-1-8, tabl. 3.3', Ed: g.pZ !== null && g.p1Min / g.pZ > g.p2Min / g.pY ? g.p1Min : g.p2Min, Rd: g.pZ !== null && g.p1Min / g.pZ > g.p2Min / g.pY ? g.pZ : g.pY, unit: 'mm', util: g.uP, d: { C } }));
+        if (!g.inside) out.checks.push(BS.check({ id: 'PBk', grp: GB0, n: `Odstęp osi kotwy od słupa (podkładka Ø ≈ 2d poza spoiną, luz montażowy): ${g.inside ? 'kotwa w obrysie słupa' : U.fmt(g.clr, 0) + ' mm'}`, ref: 'zasada konstrukcyjna; PN-EN 1090-2', Ed: g.cReq, Rd: g.clr, unit: 'mm', util: g.uK, d: { C } }));
+      }
       if (C.err.length) out.checks.push(BS.check({ id: 'PBG', grp: 'Podstawa słupa (PN-EN 1993-1-8)', n: 'Geometria podstawy: ' + C.err.map(e => e.replace(/^Podstawa: /, '')).join(' '), ref: 'PN-EN 1993-1-8, 6.2.5, tabl. 3.3', Ed: 1, Rd: 0, unit: '-', util: Infinity, forceStatus: 'fail', d: { C } }));
       if (!C.err.length) {
         const fixedModel = md.bc.dol.y === 'utw' || md.bc.dol.z === 'utw' || !!out.baseSpring;
@@ -4635,19 +4675,22 @@ J.designBase = function (st, R, eta) {
   let best = null;
   const forces = R.baseForces;
   ds.forEach(dn => kls.forEach(kl => {
-    const d = BS.M.SRUBY[dn].d, d0 = BS.M.d0Kotwy(d), ez = Math.max(50, Math.ceil(1.5 * d0 / 5) * 5);
-    const extList = fixed ? [2 * ez + 30, 2 * ez + 60, 2 * ez + 90, 2 * ez + 130] : [40, 60];
+    const d = BS.M.SRUBY[dn].d, d0 = BS.M.d0Kotwy(d), ez = Math.max(50, Math.ceil(1.5 * d0 / 5) * 5), cK = Math.ceil((10 * Math.SQRT2 + d + 5) / 5) * 5;
+    const extList = fixed ? [ez + Math.max(cK, ez) + 10, 2 * ez + 30, 2 * ez + 60, 2 * ez + 90, 2 * ez + 130] : [40, 60];
     extList.forEach(ext => {
       const lp = Math.ceil((h + 2 * ext) / 10) * 10;
-      [Math.max(30, Math.ceil(1.2 * d0 / 5) * 5 + 10), 60, 80].forEach(ey => {
-        const bp = Math.ceil((b + 2 * Math.max(ey - 10, 30)) / 10) * 10;
-        const w = Math.max(b + 2 * 20, bp - 2 * Math.max(ey, Math.ceil(1.2 * d0)));
+      // odległość osi otworu od krawędzi e_y ≥ 1,2·d0 (tabl. 3.3) – najpierw e_y, potem szerokość blachy; rozstaw w ≥ max(b + 40, 2,4·d0)
+      const eMinR = Math.ceil(1.2 * d0 / 5) * 5;
+      const ukList = fixed ? ['zew'] : (st.podstawa.kotwy.uklad === 'os' ? ['os'] : ['wew', 'os']);
+      [Math.max(eMinR, 40), Math.max(eMinR, 40) + 20, Math.max(eMinR, 40) + 40].forEach(ey => ukList.forEach(uk => {
+        const bp = Math.ceil((Math.max(b + 40, 2.4 * d0) + 2 * ey) / 10) * 10;
+        const w = bp - 2 * ey;
         for (const tp of tps) {
           const s2 = U.clone(st);
           Object.assign(s2.podstawa, { lp, bp, tp });
-          Object.assign(s2.podstawa.kotwy, { d: dn, kl, ez, w, uklad: fixed ? 'zew' : (s2.podstawa.kotwy.uklad === 'os' ? 'os' : 'wew') });
+          Object.assign(s2.podstawa.kotwy, { d: dn, kl, ez, w, uklad: uk, p: '' });
           let C; try { C = PB.components(s2, sec, R.base, ndp); } catch (e) { continue; }
-          if (C.err.length) continue;
+          if (C.err.length || C.geo.uE > 1 || C.geo.uP > 1 || C.geo.uK > 1) continue;   // tabl. 3.3 i odstęp od słupa
           // nośności bez spoin; spoiny dobierane osobno (wytężenie ∝ 1/a)
           let u = 0, uf = 0, uw = 0;
           for (const f of forces) { const r = PB.check(C, f, ndp, sec); u = Math.max(u, r.uN, r.uNt, r.uM, r.uV, r.uTV); uf = Math.max(uf, r.uWf); uw = Math.max(uw, r.uWw); if (u > lim) break; }
@@ -4661,7 +4704,7 @@ J.designBase = function (st, R, eta) {
             break;
           }
         }
-      });
+      }));
     });
   }));
   if (!best) return { err: 'Nie znaleziono podstawy spełniającej warunki w zakresie doboru (kotwy do M48, blacha do 80 mm) – rozważ żebra usztywniające lub podstawę z trawersami.' };
@@ -4708,10 +4751,10 @@ Q.svgOpen = (w, h, extra) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w
 Q.tx = (x, y, s, o) => { o = o || {}; return `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${o.fs || 11}" fill="${o.c || '#1b2230'}" text-anchor="${o.a || 'middle'}" ${o.w ? `font-weight="${o.w}"` : ''} ${o.rot ? `transform="rotate(${o.rot} ${(+x).toFixed(1)} ${(+y).toFixed(1)})"` : ''}>${s}</text>`; };
 Q.dimH = (x1, x2, y, label, o) => { o = o || {};
   return `<g stroke="#5d6778" stroke-width="0.8"><line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}"/><line x1="${x1}" y1="${y - 4}" x2="${x1}" y2="${y + 4}"/><line x1="${x2}" y1="${y - 4}" x2="${x2}" y2="${y + 4}"/>` +
-    `<line x1="${x1 - 3}" y1="${y + 3}" x2="${x1 + 3}" y2="${y - 3}"/><line x1="${x2 - 3}" y1="${y + 3}" x2="${x2 + 3}" y2="${y - 3}"/></g>` + Q.tx((x1 + x2) / 2, y + (o.below ? 13 : -4), label, { fs: o.fs || 10.5, c: '#3d4656' }); };
+    `<line x1="${x1 - 3}" y1="${y + 3}" x2="${x1 + 3}" y2="${y - 3}"/><line x1="${x2 - 3}" y1="${y + 3}" x2="${x2 + 3}" y2="${y - 3}"/></g>` + Q.tx((x1 + x2) / 2, y + (o.below ? 13 : -4), label, { fs: o.fs || 10.5, c: o.c || '#3d4656', w: o.w }); };
 Q.dimV = (x, y1, y2, label, o) => { o = o || {};
   return `<g stroke="#5d6778" stroke-width="0.8"><line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}"/><line x1="${x - 4}" y1="${y1}" x2="${x + 4}" y2="${y1}"/><line x1="${x - 4}" y1="${y2}" x2="${x + 4}" y2="${y2}"/>` +
-    `<line x1="${x - 3}" y1="${y1 + 3}" x2="${x + 3}" y2="${y1 - 3}"/><line x1="${x - 3}" y1="${y2 + 3}" x2="${x + 3}" y2="${y2 - 3}"/></g>` + Q.tx(x + (o.right ? 6 : -5), (y1 + y2) / 2, label, { fs: o.fs || 10.5, c: '#3d4656', a: o.right ? 'start' : 'middle', rot: o.right ? 0 : -90 }); };
+    `<line x1="${x - 3}" y1="${y1 + 3}" x2="${x + 3}" y2="${y1 - 3}"/><line x1="${x - 3}" y1="${y2 + 3}" x2="${x + 3}" y2="${y2 - 3}"/></g>` + Q.tx(x + (o.right ? 6 : -5), (y1 + y2) / 2, label, { fs: o.fs || 10.5, c: o.c || '#3d4656', w: o.w, a: o.right ? 'start' : 'middle', rot: o.right ? 0 : -90 }); };
 
 /* kolory rysunków w motywie ciemnym: stałe kolory #rrggbb → zmienne --sv-rrggbb (zdefiniowane w CSS) */
 const SVCOL = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
@@ -5275,11 +5318,11 @@ D.basePlate = function (C0, sec, o) {
   const W = o.W || 620, Hh = o.H || 360;
   const { lp, bp, tp } = C0;
   // rzut: z pionowo (l_p), y poziomo (b_p)
-  const scP = Math.min((W * 0.5 - 110) / bp, (Hh - 96) / lp);
-  const cxP = 60 + bp * scP / 2, cyP = Hh / 2 + 2;
+  const scP = Math.min((W * 0.5 - 110) / bp, (Hh - 128) / lp);
+  const cxP = 60 + bp * scP / 2, cyP = Hh / 2 - 8;
   const X = (y) => cxP + y * scP, Y = (z) => cyP - z * scP;
   let s = svgOpen(W, Hh, 'class="basesvg" style="max-width:100%;height:auto"');
-  const ed = (k, x, y, w, h, t) => `<rect class="bzd" data-bk="${k}" x="${x}" y="${y}" width="${Math.max(12, w)}" height="${Math.max(12, h)}" fill="transparent" style="cursor:text"><title>${t} – kliknij, aby zmienić na rysunku</title></rect>`;
+  const ed = (k, x, y, w, h, t, bv) => `<rect class="bzd" data-bk="${k}"${bv !== undefined ? ` data-bv="${bv}"` : ''} x="${x}" y="${y}" width="${Math.max(12, w)}" height="${Math.max(12, h)}" fill="transparent" style="cursor:text"><title>${t} – kliknij, aby zmienić na rysunku</title></rect>`;
   const gz = (z, t, inner) => `<g class="bz" data-bz="${z}" style="cursor:pointer"><title>${t}</title>${inner}</g>`;
   s += tx(8, 16, 'Podstawa słupa – rzut', { fs: 11.5, w: 650, a: 'start' });
   s += gz('plate', 'Blacha podstawy – kliknij: wymiary, grubość, stal', `<rect x="${X(-bp / 2)}" y="${Y(lp / 2)}" width="${bp * scP}" height="${lp * scP}" fill="#e3e8f0" stroke="${C.ink}" stroke-width="1.2"/>`);
@@ -5305,9 +5348,24 @@ D.basePlate = function (C0, sec, o) {
   s += Q.dimH(X(-bp / 2), X(bp / 2), Y(lp / 2) - 12, `b<tspan baseline-shift="sub" font-size="75%">p</tspan> = ${fmt(bp, 0)}`);
   s += Q.dimV(X(-bp / 2) - 14, Y(-lp / 2), Y(lp / 2), `l<tspan baseline-shift="sub" font-size="75%">p</tspan> = ${fmt(lp, 0)}`);
   s += ed('podstawa.bp', X(-bp / 2), Y(lp / 2) - 26, bp * scP, 18, 'Szerokość blachy b_p') + ed('podstawa.lp', X(-bp / 2) - 32, Y(lp / 2), 22, lp * scP, 'Długość blachy l_p');
-  if (anchors.length) { const yA = Math.max(...anchors.map(a => a[0])), yB = Math.min(...anchors.map(a => a[0])); s += Q.dimH(X(yB), X(yA), Y(-lp / 2) + 14, `w = ${fmt(C0.w, 0)}`, { below: true }) + ed('podstawa.kotwy.w', X(yB), Y(-lp / 2) + 8, X(yA) - X(yB), 22, 'Rozstaw kotew w rzędzie w'); }
-  if (C0.uk === 'zew') s += Q.dimV(X(bp / 2) + 14, Y(C0.zT), Y(-C0.zT), `2z<tspan baseline-shift="sub" font-size="75%">T</tspan> = ${fmt(2 * C0.zT, 0)}`, { right: true }) + ed('podstawa.kotwy.ez', X(bp / 2) + 6, Y(C0.zT), 26, 2 * C0.zT * scP, 'Odległość rzędu kotew od krawędzi blachy e_z (2z_T = l_p − 2e_z)');
-  s += tx(X(bp / 2) + 6, Y(lp / 2) + 4, `${C0.nb} × ${o.dName || ''} kl. ${o.kl || ''}`, { fs: 9.5, c: C.red, a: 'start' });
+  // łańcuchy wymiarowe osi otworów: e_y | w | e_y (wzdłuż b_p) oraz e_z | p | e_z (wzdłuż l_p); czerwone – poniżej minimum tabl. 3.3
+  const G = C0.geo || {}, sub = (a, b2) => `${a}<tspan baseline-shift="sub" font-size="75%">${b2}</tspan>`;
+  const bad = (v, mn) => (v < mn - 1e-6 ? { c: C.red, w: 700 } : {});
+  if (anchors.length) {
+    const yA = Math.max(...anchors.map(a => a[0])), yB = Math.min(...anchors.map(a => a[0])), yD = Y(-lp / 2) + 14;
+    const eY = (bp - C0.w) / 2, eOk = bad(eY, G.eMin || 0), pOk = bad(C0.w, G.p2Min || 0);
+    s += Q.dimH(X(-bp / 2), X(yB), yD, `${fmt(eY, 0)}`, Object.assign({ below: true, fs: 9.5 }, eOk)) + Q.dimH(X(yB), X(yA), yD, `w = ${fmt(C0.w, 0)}`, Object.assign({ below: true }, pOk)) + Q.dimH(X(yA), X(bp / 2), yD, `${fmt(eY, 0)}`, Object.assign({ below: true, fs: 9.5 }, eOk));
+    s += ed('podstawa.kotwy.eY', X(-bp / 2), yD - 6, X(yB) - X(-bp / 2), 22, 'Odległość osi otworu od krawędzi blachy e_y', eY) + ed('podstawa.kotwy.w', X(yB), yD - 6, X(yA) - X(yB), 22, 'Rozstaw kotew w rzędzie w (p₂)') + ed('podstawa.kotwy.eY', X(yA), yD - 6, X(bp / 2) - X(yA), 22, 'Odległość osi otworu od krawędzi blachy e_y', eY);
+    const zAx = Math.max(...anchors.map(a => a[1])), xD = X(bp / 2) + 14, eZ = lp / 2 - zAx, ezOk = bad(eZ, G.eMin || 0);
+    const kEz = C0.uk === 'zew' ? 'podstawa.kotwy.ez' : zAx > 0 ? 'podstawa.kotwy.eZw' : null;
+    s += Q.dimV(xD, Y(lp / 2), Y(zAx), `${fmt(eZ, 0)}`, Object.assign({ right: true, fs: 9.5 }, ezOk));
+    if (zAx > 0) s += Q.dimV(xD, Y(zAx), Y(-zAx), C0.uk === 'zew' ? `${sub('2z', 'T')} = ${fmt(2 * zAx, 0)}` : `p = ${fmt(2 * zAx, 0)}`, Object.assign({ right: true }, bad(2 * zAx, G.p1Min || 0)));
+    s += Q.dimV(xD, Y(-zAx), Y(-lp / 2), `${fmt(eZ, 0)}`, Object.assign({ right: true, fs: 9.5 }, ezOk));
+    if (kEz) s += ed(kEz, xD - 6, Y(lp / 2), 34, Y(zAx) - Y(lp / 2), 'Odległość osi otworu od krawędzi blachy e_z', eZ) + ed(kEz, xD - 6, Y(-zAx), 34, Y(-lp / 2) - Y(-zAx), 'Odległość osi otworu od krawędzi blachy e_z', eZ);
+    if (zAx > 0) s += ed(C0.uk === 'zew' ? 'podstawa.kotwy.zT2' : 'podstawa.kotwy.p', xD - 6, Y(zAx), 60, Y(-zAx) - Y(zAx), C0.uk === 'zew' ? 'Rozstaw rzędów kotew 2z_T (p₁)' : 'Rozstaw rzędów kotew p (p₁)', 2 * zAx);
+    if (G.eMin) s += tx(X(-bp / 2) - 30, Y(-lp / 2) + 44, `min. (tabl. 3.3): e ≥ 1,2d₀ = ${fmt(G.eMin, 0)}; p₁ ≥ 2,2d₀ = ${fmt(G.p1Min, 0)}; p₂ ≥ 2,4d₀ = ${fmt(G.p2Min, 0)} mm (d₀ = ${fmt(G.d0, 0)})`, { fs: 8.5, a: 'start', c: (G.uE > 1 || G.uP > 1) ? C.red : C.mut });
+  }
+  s += tx(X(bp / 2) + 6, Y(lp / 2) - 26, `${C0.nb} × ${o.dName || ''} kl. ${o.kl || ''}`, { fs: 9.5, c: C.red, a: 'start' });
   // widok z boku
   const x0 = W * 0.56, wv = W - x0 - 80, scV = Math.min(wv / lp, 1.2 * scP);
   const cxV = x0 + wv / 2, yP = Hh * 0.52;
@@ -5797,6 +5855,26 @@ RP.tokBase = function (c, R, S) {
       if (c.id === 'PBWf') { h += eq('F_f', '|M_{y,Ed}|/(h − t_f) + |N_{Ed}|·A_f/A', '', kN(r.wf.Ff1), 'kN', 'metoda uproszczona') + eq('f_w', '√[(F_f/(a_f·l_{wf}))² + (V_y/(2a_f·l_{wf}))²]', `a_f = ${fm(C.af, 0)} mm, l<sub>wf</sub> = ${fm(C.lwf, 0)} mm`, fm(r.wf.fw, 1), 'MPa', '4.5.3.3'); h += verd(fm(r.wf.fw, 1), fm(C.fvwd, 1), c.util, 'MPa'); }
       else { h += eq('f_w', 'V_{z,Ed}/(a_w·l_{ww})', `${kN(fo.Vz)}·10³/(${fm(C.aw, 0)}·${fm(C.lww, 0)})`, fm(r.wf.fvz, 1), 'MPa'); h += verd(fm(r.wf.fvz, 1), fm(C.fvwd, 1), c.util, 'MPa'); }
       break;
+    case 'PBe': case 'PBp': case 'PBk': {
+      const g = C.geo;
+      h += line(`Kotwy ${C.nb} × ${esc((C.kt && C.kt.d) || '')}, otwory w blasze d<sub>0</sub> = ${fm(g.d0, 0)} mm (otwory powiększone pod kotwy); układ: ${C.uk === 'zew' ? '2 rzędy poza pasami' : C.nb === 2 ? '2 kotwy w osi' : '4 kotwy między pasami'}; blacha ${fm(C.lp, 0)} × ${fm(C.bp, 0)} mm`, 'PN-EN 1993-1-8, tabl. 3.3');
+      if (c.id === 'PBe') {
+        h += eq('e_y', '(b_p − w)/2', `(${fm(C.bp, 0)} − ${fm(g.pY, 0)})/2`, fm(g.eY, 1), 'mm') + eq('e_z', C.uk === 'zew' ? 'l_p/2 − z_T' : g.pZ !== null ? '(l_p − p)/2' : 'l_p/2', C.uk === 'zew' ? `${fm(C.lp, 0)}/2 − ${fm(g.pZ / 2, 1)}` : g.pZ !== null ? `(${fm(C.lp, 0)} − ${fm(g.pZ, 0)})/2` : '', fm(g.eZ, 1), 'mm');
+        h += eq('e_{min}', '1,2·d_0', `1,2·${fm(g.d0, 0)}`, fm(g.eMin, 1), 'mm', 'tabl. 3.3');
+        h += verd(fm(g.eMin, 1), fm(g.eGov, 1), c.util, 'mm');
+        h += line(`Uwaga: dla elementów narażonych na korozję zaleca się e ≤ 4t + 40 mm = ${fm(g.eMaxCorr, 0)} mm (tabl. 3.3, wartość maksymalna).`);
+      } else if (c.id === 'PBp') {
+        h += eq('p_2', 'w (rozstaw kotew w rzędzie, kierunek y)', '', fm(g.pY, 1), 'mm') + eq('p_{2,min}', '2,4·d_0', `2,4·${fm(g.d0, 0)}`, fm(g.p2Min, 1), 'mm', 'tabl. 3.3');
+        if (g.pZ !== null) h += eq('p_1', C.uk === 'zew' ? '2z_T (rozstaw rzędów, kierunek z)' : 'p (rozstaw rzędów, kierunek z)', '', fm(g.pZ, 1), 'mm') + eq('p_{1,min}', '2,2·d_0', `2,2·${fm(g.d0, 0)}`, fm(g.p1Min, 1), 'mm', 'tabl. 3.3');
+        h += eq('η', g.pZ !== null ? 'max(p_{2,min}/p_2; p_{1,min}/p_1)' : 'p_{2,min}/p_2', '', fm(c.util, 3), '≤ 1', '', c.util <= 1 ? ['ok', '✔'] : ['fail', '✖']);
+      } else {
+        h += line('Wymaganie konstrukcyjno-montażowe: podkładka i nakrętka kotwy nie mogą nachodzić na spoinę słupa z blachą; potrzebny luz na klucz.');
+        h += eq('c_{req}', 'a√2 + d_w/2 + 5', `${fm(g.weldLeg, 1)} + ${fm(g.dw, 0)}/2 + 5`, fm(g.cReq, 1), 'mm', 'd_w ≈ 2d – podkładka');
+        h += line(g.inside ? '<span class="fail">Oś kotwy w obrysie przekroju słupa – układ niewykonalny.</span>' : `Najmniejsza odległość osi kotwy od obrysu słupa (lico pasa / środnika / ścianki): <b>${fm(g.clr, 1)} mm</b>`);
+        h += verd(fm(g.cReq, 1), g.inside ? '0' : fm(g.clr, 1), c.util, 'mm');
+      }
+      break;
+    }
     case 'PBS': {
       const s1 = d, st = C.stiff;
       h += line(`k<sub>13</sub> (beton) = E<sub>c</sub>√(b<sub>eff</sub>l<sub>eff</sub>)/(1,275E) = ${fm(st.k13, 2)} mm; k<sub>15</sub> (blacha) = ${fm(st.k15, 3)} mm; k<sub>16</sub> (kotwy) = ${fm(st.k16, 3)} mm`, 'tabl. 6.11');
@@ -7092,9 +7170,14 @@ const BZ_KEYS = {
   tstub: ['podstawa.beton', 'podstawa.podlewka', 'podstawa.kjRecz']
 };
 const BZ_N = { plate: 'Blacha podstawy…', anch: 'Kotwy…', weld: 'Spoiny słupa z blachą…', conc: 'Fundament i beton…', grout: 'Podlewka…', tstub: 'Strefy docisku…' };
-function inlineEdit(x, y, key, label, after) {
+const DERIV = {
+  'podstawa.kotwy.eY': (n, st) => ['podstawa.kotwy.w', U.num(st.podstawa.bp) - 2 * n],
+  'podstawa.kotwy.eZw': (n, st) => ['podstawa.kotwy.p', U.num(st.podstawa.lp) - 2 * n],
+  'podstawa.kotwy.zT2': (n, st) => ['podstawa.kotwy.ez', (U.num(st.podstawa.lp) - n) / 2]
+};
+function inlineEdit(x, y, key, label, after, bv) {
   const old = $('.inled'); if (old) old.remove();
-  const v = Q.getP(S(), key);
+  const v = bv !== undefined && bv !== null && bv !== '' ? Math.round(+bv * 10) / 10 : Q.getP(S(), key);
   const d = document.createElement('div'); d.className = 'inled';
   d.innerHTML = `<label>${sym(label)}</label><input class="txt" value="${esc(showNum(v))}" autocomplete="off"><span class="u">mm</span><small>Enter – zastosuj, Esc – anuluj</small>`;
   document.body.appendChild(d);
@@ -7108,7 +7191,10 @@ function inlineEdit(x, y, key, label, after) {
     const n = parseNum(inp.value);
     if (n === null || !(n > 0)) { inp.classList.add('bad'); return; }
     close();
-    if (n !== U.num(v)) { Q.setP(S(), key, n); A.changed(true); if (after) after(); }
+    if (n === U.num(v)) return;
+    if (DERIV[key]) { const [k2, v2] = DERIV[key](n, S()); if (!(v2 > 0)) { Q.toast('Wartość poza zakresem – wymiar wynikowy byłby ≤ 0.'); return; } Q.setP(S(), k2, Math.round(v2 * 10) / 10); }
+    else Q.setP(S(), key, n);
+    A.changed(true); if (after) after();
   };
   const outside = (e) => { if (!d.contains(e.target)) apply(); };
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); apply(); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } });
@@ -7123,7 +7209,7 @@ A.bindBaseFig = function (root, inPopup) {
     if (els.length) { Q.hlg(els); try { els[0].focus({ preventScroll: true }); } catch (e) { /* */ } }
   };
   $$('.bz', svg).forEach(g => g.addEventListener('click', ev => { ev.stopPropagation(); focus(g.dataset.bz); }));
-  $$('.bzd', svg).forEach(rc => rc.addEventListener('click', ev => { ev.stopPropagation(); const t = rc.querySelector('title'); inlineEdit(ev.clientX, ev.clientY, rc.dataset.bk, t ? t.textContent.replace(/ – kliknij.*$/, '') : rc.dataset.bk); }));
+  $$('.bzd', svg).forEach(rc => rc.addEventListener('click', ev => { ev.stopPropagation(); const t = rc.querySelector('title'); inlineEdit(ev.clientX, ev.clientY, rc.dataset.bk, t ? t.textContent.replace(/ – kliknij.*$/, '') : rc.dataset.bk, null, rc.dataset.bv); }));
   svg.addEventListener('contextmenu', ev => {
     ev.preventDefault();
     const g = ev.target.closest && ev.target.closest('.bz');
@@ -7152,6 +7238,7 @@ A.basePopup = function (focusZ) {
     { k: 'podstawa.kotwy.w', t: 'num', l: 'Rozstaw kotew w rzędzie w', u: 'mm', list: [120, 150, 180, 200, 220, 250, 280, 300, 350], min: 40 },
     { k: 'podstawa.kotwy.p', t: 'num', l: 'Rozstaw rzędów p (między pasami)', u: 'mm', list: ['', 100, 150, 200, 250, 300], opt: true, ph: 'auto', min: 0, show: s => s.podstawa.kotwy.uklad === 'wew' },
     { k: 'podstawa.scinanieKotwy', t: 'chk', l: 'Kotwy przenoszą ścinanie (podkładki przyspawane)' },
+    { t: 'hint', h: () => { const r = R(), g = r && r.pb && r.pb.C && r.pb.C.geo; if (!g) return ''; const c = (v, mn) => `<b style="color:var(--${v + 1e-6 < mn ? 'fail' : 'ok'})">${fmt(v, 0)}</b>`; return `Otwory d₀ = ${fmt(g.d0, 0)} mm (tabl. 3.3): e<sub>y</sub> = ${c(g.eY, g.eMin)}, e<sub>z</sub> = ${c(g.eZ, g.eMin)} ≥ 1,2d₀ = ${fmt(g.eMin, 0)} mm; p₂ = ${c(g.pY, g.p2Min)} ≥ 2,4d₀ = ${fmt(g.p2Min, 0)} mm${g.pZ !== null ? `; p₁ = ${c(g.pZ, g.p1Min)} ≥ 2,2d₀ = ${fmt(g.p1Min, 0)} mm` : ''}; odstęp osi kotwy od słupa ${g.inside ? '<b style="color:var(--fail)">kotwa w obrysie słupa</b>' : c(g.clr, g.cReq)} ≥ ${fmt(g.cReq, 0)} mm (podkładka Ø ≈ 2d, spoina a√2, luz 5 mm). Wymiary e i p można zmieniać na rysunku.`; } },
     { t: 'sub', l: 'Fundament i spoiny' },
     { k: 'podstawa.beton', t: 'sel', l: 'Beton fundamentu', o: () => Object.keys(M.BETON).map(k => [k, k]) },
     { k: 'podstawa.podlewka', t: 'num', l: 'Podlewka t_{g}', u: 'mm', list: [20, 30, 40, 50], min: 0 },
@@ -7695,8 +7782,12 @@ W3.dxf = function (S, R) {
     Dw.line(PX(0), PY(-C0.lp / 2 - 30), PX(0), PY(C0.lp / 2 + 30), 'OSIE'); Dw.line(PX(-C0.bp / 2 - 30), PY(0), PX(C0.bp / 2 + 30), PY(0), 'OSIE');
     Dw.dimH(PX(-C0.bp / 2), PX(C0.bp / 2), PY(C0.lp / 2) + 8, f0(C0.bp, 0));
     Dw.dimV(PX(-C0.bp / 2) - 8, PY(-C0.lp / 2), PY(C0.lp / 2), f0(C0.lp, 0));
-    if (an.length > 1) Dw.dimH(PX(-C0.w / 2), PX(C0.w / 2), PY(-C0.lp / 2) - 8, f0(C0.w, 0));
-    if (C0.uk === 'zew') Dw.dimV(PX(C0.bp / 2) + 8, PY(-C0.zT), PY(C0.zT), f0(2 * C0.zT, 0));
+    // łańcuchy wymiarowe osi otworów: e_y | w | e_y oraz e_z | 2z_T (p) | e_z
+    const eY = (C0.bp - C0.w) / 2, zA = Math.max(...an.map(a => a[1])), eZ = C0.lp / 2 - zA;
+    if (an.length > 1) { Dw.dimH(PX(-C0.bp / 2), PX(-C0.w / 2), PY(-C0.lp / 2) - 8, f0(eY, 0)); Dw.dimH(PX(-C0.w / 2), PX(C0.w / 2), PY(-C0.lp / 2) - 8, f0(C0.w, 0)); Dw.dimH(PX(C0.w / 2), PX(C0.bp / 2), PY(-C0.lp / 2) - 8, f0(eY, 0)); }
+    Dw.dimV(PX(C0.bp / 2) + 8, PY(zA), PY(C0.lp / 2), f0(eZ, 0));
+    if (zA > 0) Dw.dimV(PX(C0.bp / 2) + 8, PY(-zA), PY(zA), f0(2 * zA, 0));
+    Dw.dimV(PX(C0.bp / 2) + 8, PY(-C0.lp / 2), PY(-zA), f0(eZ, 0));
     Dw.text(PX(0), PY(C0.lp / 2) + 18, 3, `BLACHA PODSTAWY ${f0(C0.tp, 0)}×${f0(C0.bp, 0)}×${f0(C0.lp, 0)} ${C0.gat} – rzut 1:${Kp}`, 'OPISY', 'c');
     Dw.text(PX(0), PY(-C0.lp / 2) - 18, 2.2, `${C0.nb} × ${S.podstawa.kotwy.d} kl. ${S.podstawa.kotwy.kl}, otwory %%c${f0(C0.d0, 0)}; spoiny: pasy a = ${f0(C0.af, 0)}, środnik a = ${f0(C0.aw, 0)}`, 'OPISY', 'c');
     Dw.text(PX(0), PY(-C0.lp / 2) - 23, 2.2, `podlewka ${f0(C0.tg, 0)} mm, beton fundamentu ${S.podstawa.beton}`, 'OPISY', 'c');

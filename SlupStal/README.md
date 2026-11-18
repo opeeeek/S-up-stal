@@ -19,7 +19,7 @@ każdego parametru.
 | Nośność przekroju | klasyfikacja przy N + M<sub>y</sub> + M<sub>z</sub>, klasa 4 (A<sub>eff</sub>, W<sub>eff</sub>, e<sub>N</sub>), M<sub>N,Rd</sub>, zginanie dwukierunkowe (6.41), naprężenia (6.42/6.44), ścinanie z redukcją, wyboczenie środnika przy ścinaniu – na całej wysokości słupa | 5.5, 6.2; PN-EN 1993-1-5 |
 | Interakcja | 6.61/6.62 z k<sub>ij</sub> wg zał. A lub B, C<sub>m</sub> wg tabl. B.3 / A.2 (postać przechyłowa: 0,9); metoda ogólna 6.3.4 (opcja) | 6.3.3, 6.3.4 |
 | SGU | przemieszczenia poziome w obu kierunkach (H/150, H/300, H/500, własne) | PN-EN 1990 A1.4; 7.2 |
-| Podstawa słupa | metoda składnikowa: f<sub>jd</sub>, c, króćce teowe, blacha zginana i kotwy (L<sub>b</sub>, L<sub>b</sub>*, postacie 1–3), M<sub>j,Rd</sub> wg tabl. 6.7, ścinanie (tarcie + kotwy), kotwa: rozciąganie + ścinanie, spoiny, S<sub>j,ini</sub> i klasyfikacja; opcjonalnie podatność podstawy w modelu | PN-EN 1993-1-8 |
+| Podstawa słupa | metoda składnikowa: f<sub>jd</sub>, c, króćce teowe, blacha zginana i kotwy (L<sub>b</sub>, L<sub>b</sub>*, postacie 1–3), M<sub>j,Rd</sub> wg tabl. 6.7, ścinanie (tarcie + kotwy), kotwa: rozciąganie + ścinanie, spoiny, S<sub>j,ini</sub> i klasyfikacja; opcjonalnie podatność podstawy w modelu; rozmieszczenie otworów: e<sub>y</sub>, e<sub>z</sub> ≥ 1,2d<sub>0</sub>, p<sub>1</sub> ≥ 2,2d<sub>0</sub>, p<sub>2</sub> ≥ 2,4d<sub>0</sub> (tabl. 3.3), odstęp kotwy od słupa (podkładka, spoina, luz montażowy) – sprawdzane i przestrzegane w doborze | PN-EN 1993-1-8 |
 | Pożar | temperatura stali (bez ochrony / z ochroną), ISO 834; elementy ściskane i ściskane ze zginaniem (4.2.3.2, 4.2.3.5); θ<sub>cr</sub>, czas | PN-EN 1993-1-2 |
 | Kruche pękanie, wykonanie | t<sub>max</sub> wg tabl. 2.1; klasa EXC i wymagania | PN-EN 1993-1-10; PN-EN 1090-2 |
 | Dobór | najlżejszy kształtownik serii; podstawa (wymiary, grubość, kotwy, spoiny); „dobierz wszystko” z iteracją przy podstawie podatnej | – |
@@ -38,7 +38,7 @@ k<sub>c</sub>, C<sub>my</sub>, C<sub>mz</sub>, C<sub>mLT</sub>, φ, e₀, f<sub>
   M / V / N / przemieszczenia / postać wyboczenia, wybór kombinacji, „Zestawienie obciążeń”, „Kombinacje
   decydujące”, siły na fundament.
 * **Podstawa** – rysunek podstawy jest klikalny: element (blacha, kotwy, spoiny, podlewka, fundament) – jego
-  parametry w projektancie podstawy; wymiar (b<sub>p</sub>, l<sub>p</sub>, t<sub>p</sub>, rozstaw kotew, podlewka) – zmiana wartości wprost na rysunku.
+  parametry w projektancie podstawy; wymiar (b<sub>p</sub>, l<sub>p</sub>, t<sub>p</sub>, odległości osi otworów od krawędzi e<sub>y</sub>, e<sub>z</sub>, rozstawy kotew, podlewka) – zmiana wartości wprost na rysunku; wymiary poniżej minimum tabl. 3.3 – na czerwono.
 * **Słup i podstawa** – widok 2D (rzut z podstawą, fundamentem, stężeniami) przełączany na **widok 3D**
   (obrót, przesuw, powiększenie, widoki standardowe; obciążenia, fundament, postacie wyboczenia: giętne y/z,
   skrętne/giętno-skrętne, zwichrzenie, ugięcia SGU); przekrój pod kursorem, zestawienie materiałów, DXF.
@@ -75,7 +75,7 @@ Ikona: `node host/make-icon.js` i `rsrc -ico host/slupstal.ico -arch amd64 -o ho
 ```bash
 node test/fe.test.js         # MES wobec rozwiązań zamkniętych (N_cr, II rząd, imperfekcje, N_cr,T, M_cr, N_cr,TF)
 node test/engine.test.js     # przykłady liczone ręcznie + przegląd 28 konfiguracji + dobór
-node test/ui.test.js         # test funkcjonalny interfejsu (Playwright/Chromium): 51 scenariuszy
+node test/ui.test.js         # test funkcjonalny interfejsu (Playwright/Chromium): 53 scenariusze
 ```
 
 ## Struktura

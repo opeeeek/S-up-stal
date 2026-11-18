@@ -139,6 +139,11 @@ const path = require('path'), fs = require('fs');
   { const bd = await p.$('#modal svg.basesvg .bzd[data-bk="podstawa.bp"]'); const q = await bd.boundingBox(); await p.mouse.click(q.x + q.width / 2, q.y + q.height / 2); await p.waitForTimeout(250); }
   await p.fill('.inled input', '440'); await p.press('.inled input', 'Enter'); await p.waitForTimeout(1500);
   ok('rysunek podstawy: zmiana b_p na rysunku', (await p.evaluate(() => BS.A.S().podstawa.bp)) === 440);
+  ok('rysunek podstawy: wymiary osi otworów od krawędzi (e_y, e_z)', (await p.$$('#modal svg.basesvg .bzd[data-bk="podstawa.kotwy.eY"]')).length === 2 && (await p.$$('#modal svg.basesvg .bzd[data-bk="podstawa.kotwy.ez"]')).length === 2);
+  { const e = await p.$('#modal svg.basesvg .bzd[data-bk="podstawa.kotwy.eY"]'); const q = await e.boundingBox(); await p.mouse.click(q.x + q.width / 2, q.y + q.height / 2); await p.waitForTimeout(250); }
+  await p.fill('.inled input', '30'); await p.press('.inled input', 'Enter'); await p.waitForTimeout(1500);
+  ok('rysunek podstawy: e_y = 30 mm na rysunku → w = b_p − 2e_y i warunek tabl. 3.3 niespełniony', await p.evaluate(() => { const S = BS.A.S(); return +S.podstawa.kotwy.w === +S.podstawa.bp - 60 && BS.A.R().checks.find(c => c.id === 'PBe').status === 'fail'; }));
+  await p.evaluate(() => { const S = BS.A.S(); S.podstawa.kotwy.w = +S.podstawa.bp - 100; BS.A.changed(true); }); await p.waitForTimeout(1200);
   await p.click('#pOk'); await p.waitForTimeout(200);
   // przekrój: strefy klikalne
   await p.click('.tabs button[data-tab="sec"]'); await p.waitForTimeout(700);
